@@ -72,9 +72,19 @@ app.get('/api/status', async (req, res) => {
       mcOnline = await checkMinecraftServerStatus(publicIp, MC_PORT);
     }
 
+    // Xác định địa chỉ hiển thị trên giao diện (Ưu tiên CUSTOM_SERVER_ADDRESS nếu tự cấu hình)
+    const customAddress = (process.env.CUSTOM_SERVER_ADDRESS || '').trim();
+    let serverAddress = '';
+    if (customAddress) {
+      serverAddress = customAddress;
+    } else if (publicIp) {
+      serverAddress = `${publicIp}:${MC_PORT}`;
+    }
+
     res.json({
       ec2State: state, // 'stopped' | 'pending' | 'running' | 'stopping'
       publicIp,
+      serverAddress,
       mcPort: MC_PORT,
       mcOnline,
       turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || ''

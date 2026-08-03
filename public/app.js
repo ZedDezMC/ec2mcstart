@@ -47,12 +47,12 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Đang cập nhật trạng thái...');
   });
 
-  // Copy IP Button
+  // Copy Address Button
   btnCopyIp.addEventListener('click', () => {
     const ipText = serverIpEl.textContent;
     navigator.clipboard.writeText(ipText).then(() => {
       copyTextEl.textContent = 'Đã sao chép!';
-      setTimeout(() => copyTextEl.textContent = 'Sao chép IP', 2000);
+      setTimeout(() => copyTextEl.textContent = 'Sao chép', 2000);
     });
   });
 
@@ -142,10 +142,10 @@ document.addEventListener('DOMContentLoaded', () => {
         updateBadge(mcStatusBadge, 'offline');
       }
 
-      // Update IP Display
-      if (data.publicIp) {
+      // Update Server Address Display
+      if (data.serverAddress && (data.ec2State === 'running' || data.ec2State === 'pending')) {
         ipContainer.classList.remove('hidden');
-        serverIpEl.textContent = `${data.publicIp}:${data.mcPort || 25565}`;
+        serverIpEl.textContent = data.serverAddress;
       } else {
         ipContainer.classList.add('hidden');
       }
