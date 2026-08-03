@@ -319,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (rem <= 0) {
         clear5MinLock();
         unlockRequestMcButton();
-        showToast('[INFO] Nút đã mở! Nếu server chưa tự bật, bạn có thể gửi yêu cầu cho Admin.');
+        showToast('[INFO] Nếu server chưa tự bật, bạn có thể gửi yêu cầu cho Admin.');
       } else {
         updateLockTimerText(rem);
       }
@@ -330,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sec = Math.ceil(remMs / 1000);
     const m = Math.floor(sec / 60).toString().padStart(2, '0');
     const s = (sec % 60).toString().padStart(2, '0');
-    
+
     if (btnRequestMcText) {
       btnRequestMcText.textContent = `Tự Động Bật (Khóa Nút Trong ${m}:${s})`;
     }

@@ -1,10 +1,10 @@
-const { 
-  Client, 
-  GatewayIntentBits, 
+const {
+  Client,
+  GatewayIntentBits,
   Partials,
-  EmbedBuilder, 
-  ActionRowBuilder, 
-  ButtonBuilder, 
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
   ButtonStyle,
   REST,
   Routes,
@@ -69,18 +69,18 @@ function getDashboardActionRows() {
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId('refresh_status')
-      .setLabel('Refresh Status')
+      .setLabel('Refresh')
       .setStyle(ButtonStyle.Primary)
   );
 
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('set_dev_mode')
-      .setLabel('Dev Mode (24/7)')
+      .setLabel('Dev Mode')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('set_normal_mode')
-      .setLabel('Normal Mode (Auto-Off 30m)')
+      .setLabel('Normal Mode')
       .setStyle(ButtonStyle.Success)
   );
 
@@ -109,7 +109,7 @@ async function buildStatusEmbed() {
         mcOnline = await checkMinecraftServerStatus(publicIp, mcPort);
       }
     } catch (err) {
-      console.error('Error fetching EC2 status for Embed:', err.message);
+      console.error('error fetch status:', err.message);
     }
   }
 
@@ -126,15 +126,15 @@ async function buildStatusEmbed() {
   const embed = new EmbedBuilder()
     .setColor(embedColor)
     .setTitle('Dashboard Quan Ly Server Minecraft & AWS EC2')
-    .setDescription('Hệ thống điều khiển On-Demand All-In-One')
+    .setDescription('Làm bởi hsowndev - phục vụ riêng cho server Discord Động Chim Giấy')
     .addFields(
-      { name: 'VPS EC2 Status', value: `\`${ec2State.toUpperCase()}\``, inline: true },
-      { name: 'Minecraft Server', value: mcOnline ? '`ONLINE (READY)`' : '`OFFLINE`', inline: true },
+      { name: 'VPS Status', value: `\`${ec2State.toUpperCase()}\``, inline: true },
+      { name: 'Minecraft Server', value: mcOnline ? '`ONLINE`' : '`OFFLINE`', inline: true },
       { name: 'Public IP', value: `\`${publicIp || 'Offline'}\``, inline: true },
       { name: 'Server Address', value: `\`${serverAddress}\``, inline: false }
     )
     .setTimestamp()
-    .setFooter({ text: 'All-In-One Discord Bot Management' });
+    .setFooter({ text: 'hsowndev - Động Chim Giấy' });
 
   return embed;
 }
@@ -146,52 +146,52 @@ async function registerSlashCommands(clientId, token) {
   const commands = [
     new SlashCommandBuilder()
       .setName('status')
-      .setDescription('Kiểm tra trạng thái VPS EC2 và Minecraft Server'),
+      .setDescription('Kiểm tra trạng thái VPS và Minecraft Server'),
     new SlashCommandBuilder()
       .setName('panel')
-      .setDescription('Mở Bảng điều khiển Dashboard với các nút bấm thao tác 1-Click'),
+      .setDescription('Hiện dashboard điều khiển'),
     new SlashCommandBuilder()
       .setName('start')
-      .setDescription('Khởi động VPS EC2 và Minecraft Server'),
+      .setDescription('Khởi động VPS và Minecraft Server'),
     new SlashCommandBuilder()
       .setName('stop')
-      .setDescription('Tắt Minecraft Server an toàn và ngắt VPS EC2'),
+      .setDescription('Tắt Minecraft Server và VPS'),
     new SlashCommandBuilder()
       .setName('restart')
       .setDescription('Khởi động lại Minecraft Server'),
     new SlashCommandBuilder()
       .setName('mode')
-      .setDescription('Chuyển đổi Chế độ hoạt động (Dev Mode / Normal Mode)')
-      .addStringOption(option => 
+      .setDescription('Đổi mode (Dev Mode / Normal Mode)')
+      .addStringOption(option =>
         option.setName('type')
           .setDescription('Loại chế độ')
           .setRequired(true)
           .addChoices(
-            { name: 'Dev Mode (24/7 Không tự tắt)', value: 'dev' },
-            { name: 'Normal Mode (Tự tắt sau 30p 0 người chơi)', value: 'normal' }
+            { name: 'Dev Mode (24/7)', value: 'dev' },
+            { name: 'Normal Mode (Tự tắt sau 30p)', value: 'normal' }
           )
       ),
     new SlashCommandBuilder()
       .setName('cmd')
-      .setDescription('Gửi lệnh Console tới Server Minecraft')
+      .setDescription('Gửi lệnh tới Server Minecraft')
       .addStringOption(option =>
         option.setName('command')
-          .setDescription('Lệnh console cần thực thi')
+          .setDescription('Lệnh cần dùng')
           .setRequired(true)
       ),
     new SlashCommandBuilder()
       .setName('help')
-      .setDescription('Xem hướng dẫn sử dụng các lệnh Discord Bot')
+      .setDescription('Xem hướng dẫn sử dụng')
   ].map(cmd => cmd.toJSON());
 
   const rest = new REST({ version: '10' }).setToken(token);
 
   try {
-    console.log('[Discord Bot] Đang đăng ký Slash Commands (Global)...');
+    console.log('[Discord Bot] Đang đăng ký lệnh...');
     await rest.put(Routes.applicationCommands(clientId), { body: commands });
-    console.log('[Discord Bot] Đăng ký Slash Commands thành công!');
+    console.log('[Discord Bot] Đăng ký lệnh thành công!');
   } catch (error) {
-    console.error('[Discord Bot] Lỗi khi đăng ký Slash Commands:', error);
+    console.error('[Discord Bot] Lỗi khi đăng ký lệnh:', error);
   }
 }
 
@@ -201,7 +201,7 @@ async function registerSlashCommands(clientId, token) {
 function initDiscordBot() {
   const token = process.env.DISCORD_BOT_TOKEN;
   if (!token || token.includes('XXXXXX')) {
-    console.warn('[Discord Bot] DISCORD_BOT_TOKEN chưa được cấu hình trong .env');
+    console.warn('[Discord Bot] Chưa cấu hình token');
     return;
   }
 
@@ -219,7 +219,7 @@ function initDiscordBot() {
   });
 
   client.once('ready', async () => {
-    console.log(`[Discord Bot] Bot All-In-One online với tên: ${client.user.tag}`);
+    console.log(`[Discord Bot] Đã online với tên: ${client.user.tag}`);
     // Đăng ký Slash Commands khi Bot ready
     registerSlashCommands(client.user.id, token);
   });
@@ -233,9 +233,9 @@ function initDiscordBot() {
       const { commandName } = interaction;
 
       if (!isAuthorized(interaction.member, interaction.user)) {
-        return interaction.reply({ 
-          content: '[DENIED] Bạn không có quyền Admin hoặc Role được phép để thực thi lệnh này.', 
-          ephemeral: true 
+        return interaction.reply({
+          content: '[DENIED] Hiện tại không có quyền để thực thi lệnh này.',
+          ephemeral: true
         });
       }
 
@@ -259,12 +259,12 @@ function initDiscordBot() {
           const res = await startInstance(instanceId);
           const embed = new EmbedBuilder()
             .setColor(0x2ecc71)
-            .setTitle('[START] Dang khoi dong VPS EC2...')
-            .setDescription(`Đã gửi lệnh bật EC2 Instance (${instanceId}).\nTrạng thái trước đó: \`${res.previousState}\` -> Trạng thái hiện tại: \`${res.currentState}\`.\nVui lòng chờ khoảng 30-60 giây để server sẵn sàng.`)
+            .setTitle('[START] Dang khoi dong VPS...')
+            .setDescription(`Đã gửi lệnh bật VPS (${instanceId}).\nTrạng thái trước đó: \`${res.previousState}\` -> Trạng thái hiện tại: \`${res.currentState}\`.\nVui lòng chờ khoảng 30-60 giây để hoàn thành thao tác.`)
             .setTimestamp();
           return interaction.editReply({ embeds: [embed] });
         } catch (err) {
-          return interaction.editReply({ content: `[ERROR] Không thể khởi động EC2: ${err.message}` });
+          return interaction.editReply({ content: `[ERROR] Không thể khởi động VPS: ${err.message}` });
         }
       }
 
@@ -274,17 +274,17 @@ function initDiscordBot() {
           // Gửi lệnh save-all trước khi stop VPS
           try {
             await runSSMStartMinecraftCommand(instanceId, 'sudo systemctl stop minecraft || true');
-          } catch (e) {}
+          } catch (e) { }
 
           const res = await stopInstance(instanceId);
           const embed = new EmbedBuilder()
             .setColor(0xe74c3c)
-            .setTitle('[STOP] Dang tat VPS EC2...')
-            .setDescription(`Đã gửi lệnh tắt EC2 Instance (${instanceId}).\nTrạng thái trước đó: \`${res.previousState}\` -> Trạng thái hiện tại: \`${res.currentState}\`.`)
+            .setTitle('[STOP] Dang tat VPS...')
+            .setDescription(`Đã gửi lệnh tắt VPS (${instanceId}).\nTrạng thái trước đó: \`${res.previousState}\` -> Trạng thái hiện tại: \`${res.currentState}\`.`)
             .setTimestamp();
           return interaction.editReply({ embeds: [embed] });
         } catch (err) {
-          return interaction.editReply({ content: `[ERROR] Không thể tắt EC2: ${err.message}` });
+          return interaction.editReply({ content: `[ERROR] Không thể tắt VPS: ${err.message}` });
         }
       }
 
@@ -294,9 +294,9 @@ function initDiscordBot() {
           const pufferServerId = process.env.PUFFER_SERVER_ID;
           if (pufferServerId && process.env.PUFFER_CLIENT_ID) {
             const ssmPufferCmd = generatePufferPanelSSMCommand(
-              pufferServerId, 
-              process.env.PUFFER_CLIENT_ID, 
-              process.env.PUFFER_CLIENT_SECRET, 
+              pufferServerId,
+              process.env.PUFFER_CLIENT_ID,
+              process.env.PUFFER_CLIENT_SECRET,
               process.env.PUFFER_PORT || '8080'
             );
             await runSSMStartMinecraftCommand(instanceId, ssmPufferCmd);
@@ -304,7 +304,7 @@ function initDiscordBot() {
             const mcCmd = process.env.MC_START_COMMAND || 'sudo systemctl restart minecraft';
             await runSSMStartMinecraftCommand(instanceId, mcCmd);
           }
-          return interaction.editReply({ content: '[SUCCESS] Đã gửi lệnh Restart Minecraft Server qua SSM thành công!' });
+          return interaction.editReply({ content: '[SUCCESS] Đã gửi lệnh Restart Minecraft Server!' });
         } catch (err) {
           return interaction.editReply({ content: `[ERROR] Không thể restart Minecraft Server: ${err.message}` });
         }
@@ -316,14 +316,14 @@ function initDiscordBot() {
         if (modeType === 'dev') {
           try {
             await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py dev || sudo touch /opt/mc-autoshutdown/DEV_MODE');
-            return interaction.editReply({ content: '[DEV MODE] Đã chuyển sang DEV MODE! Tính năng tự động tắt VPS đã bị VÔ HIỆU HÓA.' });
+            return interaction.editReply({ content: '[DEV MODE] Đã chuyển sang DEV MODE' });
           } catch (err) {
             return interaction.editReply({ content: `[ERROR] Lỗi khi bật Dev Mode: ${err.message}` });
           }
         } else {
           try {
             await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py normal || sudo rm -f /opt/mc-autoshutdown/DEV_MODE');
-            return interaction.editReply({ content: '[NORMAL MODE] Đã chuyển sang NORMAL MODE! VPS sẽ tự động tắt sau 30 phút 0 người chơi.' });
+            return interaction.editReply({ content: '[NORMAL MODE] Đã chuyển sang NORMAL MODE' });
           } catch (err) {
             return interaction.editReply({ content: `[ERROR] Lỗi khi bật Normal Mode: ${err.message}` });
           }
@@ -335,26 +335,26 @@ function initDiscordBot() {
         const shellCmd = interaction.options.getString('command');
         try {
           await runSSMStartMinecraftCommand(instanceId, shellCmd);
-          return interaction.editReply({ content: `[EXEC] Đã gửi lệnh sang VPS qua SSM:\n\`\`\`bash\n${shellCmd}\n\`\`\`` });
+          return interaction.editReply({ content: `[EXEC] Đã gửi lệnh:\n\`\`\`bash\n${shellCmd}\n\`\`\`` });
         } catch (err) {
-          return interaction.editReply({ content: `[ERROR] Lỗi khi gửi lệnh qua SSM: ${err.message}` });
+          return interaction.editReply({ content: `[ERROR] Lỗi khi gửi lệnh: ${err.message}` });
         }
       }
 
       if (commandName === 'help') {
         const helpEmbed = new EmbedBuilder()
           .setColor(0x3498db)
-          .setTitle('Tro giup - Bot Discord Management All-In-One')
-          .setDescription('Danh sách các câu lệnh điều khiển hệ thống:')
+          .setTitle('Tro giup')
+          .setDescription('Danh sách các lệnh:')
           .addFields(
             { name: '`/status` hoặc `!status`', value: 'Xem trạng thái VPS EC2 và Minecraft Server realtime.', inline: false },
             { name: '`/panel` hoặc `!panel`', value: 'Mở Bảng điều khiển Dashboard trực quan dạng nút bấm.', inline: false },
             { name: '`/start` hoặc `!start`', value: 'Khởi động VPS EC2 và Minecraft Server.', inline: false },
             { name: '`/stop` hoặc `!stop`', value: 'Tắt Minecraft Server an toàn và ngắt VPS EC2.', inline: false },
             { name: '`/restart` hoặc `!restart`', value: 'Khởi động lại Minecraft Server.', inline: false },
-            { name: '`/mode dev` hoặc `!dev on`', value: 'Bật Dev Mode (Server chạy 24/7 không tự tắt).', inline: false },
+            { name: '`/mode dev` hoặc `!dev on`', value: 'Bật Dev Mode (Server chạy 24/7).', inline: false },
             { name: '`/mode normal` hoặc `!dev off`', value: 'Bật Normal Mode (Tự động tắt sau 30p 0 người chơi).', inline: false },
-            { name: '`/cmd <lệnh>` hoặc `!cmd <lệnh>`', value: 'Gửi lệnh trực tiếp vào Console VPS qua AWS SSM.', inline: false }
+            { name: '`/cmd <lệnh>` hoặc `!cmd <lệnh>`', value: 'Gửi lệnh trực tiếp vào VPS.', inline: false }
           );
         return interaction.reply({ embeds: [helpEmbed] });
       }
@@ -365,9 +365,9 @@ function initDiscordBot() {
     // --------------------------------------------------
     if (interaction.isButton()) {
       if (!isAuthorized(interaction.member, interaction.user)) {
-        return interaction.reply({ 
-          content: '[DENIED] Bạn không có quyền Admin hoặc Role được phép để thực thi hành động này.', 
-          ephemeral: true 
+        return interaction.reply({
+          content: '[DENIED] Hiện tại không có quyền để thực thi hành động này.',
+          ephemeral: true
         });
       }
 
@@ -386,9 +386,9 @@ function initDiscordBot() {
         await interaction.deferReply({ ephemeral: true });
         try {
           const res = await startInstance(instanceId);
-          return interaction.editReply({ content: `[START] Đã gửi lệnh bật EC2 Instance! Status: \`${res.currentState}\`. Vui lòng chờ 30-60s.` });
+          return interaction.editReply({ content: `[START] Đã gửi lệnh bật VPS! Status: \`${res.currentState}\`. Vui lòng chờ 30-60s.` });
         } catch (err) {
-          return interaction.editReply({ content: `[ERROR] Lỗi khi bật EC2: ${err.message}` });
+          return interaction.editReply({ content: `[ERROR] Lỗi khi bật VPS: ${err.message}` });
         }
       }
 
@@ -397,9 +397,9 @@ function initDiscordBot() {
         await interaction.deferReply({ ephemeral: true });
         try {
           await stopInstance(instanceId);
-          return interaction.editReply({ content: '[STOP] Đã gửi lệnh tắt EC2 Instance thành công!' });
+          return interaction.editReply({ content: '[STOP] Đã gửi lệnh tắt VPS thành công!' });
         } catch (err) {
-          return interaction.editReply({ content: `[ERROR] Lỗi khi tắt EC2: ${err.message}` });
+          return interaction.editReply({ content: `[ERROR] Lỗi khi tắt VPS: ${err.message}` });
         }
       }
 
@@ -420,7 +420,7 @@ function initDiscordBot() {
         await interaction.deferReply({ ephemeral: true });
         try {
           await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py dev || sudo touch /opt/mc-autoshutdown/DEV_MODE');
-          return interaction.editReply({ content: '[DEV MODE] Đã kích hoạt DEV MODE thành công! (VPS không tự tắt)' });
+          return interaction.editReply({ content: '[DEV MODE] Đã kích hoạt DEV MODE thành công' });
         } catch (err) {
           return interaction.editReply({ content: `[ERROR] Lỗi khi bật Dev Mode: ${err.message}` });
         }
@@ -431,7 +431,7 @@ function initDiscordBot() {
         await interaction.deferReply({ ephemeral: true });
         try {
           await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py normal || sudo rm -f /opt/mc-autoshutdown/DEV_MODE');
-          return interaction.editReply({ content: '[NORMAL MODE] Đã kích hoạt NORMAL MODE thành công! (VPS tự tắt sau 30p 0 người chơi)' });
+          return interaction.editReply({ content: '[NORMAL MODE] Đã kích hoạt NORMAL MODE thành công' });
         } catch (err) {
           return interaction.editReply({ content: `[ERROR] Lỗi khi bật Normal Mode: ${err.message}` });
         }
@@ -463,9 +463,9 @@ function initDiscordBot() {
             const pufferServerId = process.env.PUFFER_SERVER_ID;
             if (pufferServerId && process.env.PUFFER_CLIENT_ID) {
               const ssmPufferCmd = generatePufferPanelSSMCommand(
-                pufferServerId, 
-                process.env.PUFFER_CLIENT_ID, 
-                process.env.PUFFER_CLIENT_SECRET, 
+                pufferServerId,
+                process.env.PUFFER_CLIENT_ID,
+                process.env.PUFFER_CLIENT_SECRET,
                 process.env.PUFFER_PORT || '8080'
               );
               await runSSMStartMinecraftCommand(instanceId, ssmPufferCmd);
@@ -509,16 +509,16 @@ function initDiscordBot() {
     if (['!help', '!h'].includes(lowerContent)) {
       const helpEmbed = new EmbedBuilder()
         .setColor(0x3498db)
-        .setTitle('Tro giup - Bot Discord Management All-In-One')
+        .setTitle('Tro giup')
         .setDescription('Các câu lệnh dạng Prefix (`!`):')
         .addFields(
           { name: '`!status` / `!panel`', value: 'Mở Dashboard điều khiển trực quan.', inline: false },
-          { name: '`!start`', value: 'Bật VPS EC2 và Minecraft Server.', inline: false },
-          { name: '`!stop`', value: 'Tắt Minecraft Server và ngắt VPS EC2.', inline: false },
+          { name: '`!start`', value: 'Bật VPS và Minecraft Server.', inline: false },
+          { name: '`!stop`', value: 'Tắt Minecraft Server và ngắt VPS.', inline: false },
           { name: '`!restart`', value: 'Khởi động lại Minecraft Server.', inline: false },
-          { name: '`!dev on` / `!mode dev`', value: 'Bật Dev Mode (Server 24/7).', inline: false },
-          { name: '`!dev off` / `!mode normal`', value: 'Bật Normal Mode (Tự tắt sau 30p 0 người chơi).', inline: false },
-          { name: '`!cmd <lệnh>`', value: 'Gửi lệnh trực tiếp sang VPS via SSM.', inline: false }
+          { name: '`!dev on` / `!mode dev`', value: 'Bật Dev Mode.', inline: false },
+          { name: '`!dev off` / `!mode normal`', value: 'Bật Normal Mode.', inline: false },
+          { name: '`!cmd <lệnh>`', value: 'Gửi lệnh trực tiếp sang VPS.', inline: false }
         );
       return message.reply({ embeds: [helpEmbed] });
     }
@@ -527,9 +527,9 @@ function initDiscordBot() {
     if (lowerContent === '!start') {
       try {
         const res = await startInstance(instanceId);
-        return message.reply(`[START] Đã gửi lệnh bật EC2 Instance (${instanceId})! Status: \`${res.currentState}\`.`);
+        return message.reply(`[START] Đã gửi lệnh bật VPS (${instanceId})! Status: \`${res.currentState}\`.`);
       } catch (err) {
-        return message.reply(`[ERROR] Không thể bật EC2: ${err.message}`);
+        return message.reply(`[ERROR] Không thể bật VPS: ${err.message}`);
       }
     }
 
@@ -537,9 +537,9 @@ function initDiscordBot() {
     if (lowerContent === '!stop') {
       try {
         await stopInstance(instanceId);
-        return message.reply(`[STOP] Đã gửi lệnh tắt EC2 Instance (${instanceId})!`);
+        return message.reply(`[STOP] Đã gửi lệnh tắt VPS (${instanceId})!`);
       } catch (err) {
-        return message.reply(`[ERROR] Không thể tắt EC2: ${err.message}`);
+        return message.reply(`[ERROR] Không thể tắt VPS: ${err.message}`);
       }
     }
 
@@ -558,7 +558,7 @@ function initDiscordBot() {
     if (['!mode dev', '!dev on', '!mode devmode'].includes(lowerContent)) {
       try {
         await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py dev || sudo touch /opt/mc-autoshutdown/DEV_MODE');
-        return message.reply('[DEV MODE] Đã chuyển sang DEV MODE! VPS không tự tắt.');
+        return message.reply('[DEV MODE] Đã chuyển sang DEV MODE');
       } catch (err) {
         return message.reply(`[ERROR] Lỗi khi bật Dev Mode: ${err.message}`);
       }
@@ -568,7 +568,7 @@ function initDiscordBot() {
     if (['!mode normal', '!dev off', '!mode normalmode'].includes(lowerContent)) {
       try {
         await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py normal || sudo rm -f /opt/mc-autoshutdown/DEV_MODE');
-        return message.reply('[NORMAL MODE] Đã chuyển sang NORMAL MODE! VPS tự tắt sau 30p 0 người chơi.');
+        return message.reply('[NORMAL MODE] Đã chuyển sang NORMAL MODE');
       } catch (err) {
         return message.reply(`[ERROR] Lỗi khi bật Normal Mode: ${err.message}`);
       }
@@ -579,7 +579,7 @@ function initDiscordBot() {
       const shellCmd = content.substring(5).trim();
       try {
         await runSSMStartMinecraftCommand(instanceId, shellCmd);
-        return message.reply(`[EXEC] Đã gửi lệnh SSM:\n\`\`\`bash\n${shellCmd}\n\`\`\``);
+        return message.reply(`[EXEC] Đã gửi lệnh:\n\`\`\`bash\n${shellCmd}\n\`\`\``);
       } catch (err) {
         return message.reply(`[ERROR] Lỗi gửi lệnh: ${err.message}`);
       }
@@ -596,12 +596,12 @@ function initDiscordBot() {
  */
 async function sendMinecraftStartRequest({ requesterIp, publicIp }) {
   if (!client || !client.isReady()) {
-    throw new Error('Discord Bot chưa sẵn sàng hoặc chưa cấu hình DISCORD_BOT_TOKEN.');
+    throw new Error('Discord Bot chưa sẵn sàng hoặc chưa cấu hình token.');
   }
 
   const adminId = process.env.DISCORD_ADMIN_ID;
   if (!adminId || !adminId.trim() || adminId.includes('XXXXXX')) {
-    throw new Error('Chưa cấu hình DISCORD_ADMIN_ID trong file .env.');
+    throw new Error('Chưa cấu hình id trong file .env.');
   }
 
   const adminUser = await client.users.fetch(adminId).catch(() => null);
@@ -613,21 +613,21 @@ async function sendMinecraftStartRequest({ requesterIp, publicIp }) {
 
   const embed = new EmbedBuilder()
     .setColor(0xf1c40f)
-    .setTitle('[REQUEST] Yeu cau Bat Minecraft Server (PufferPanel / EC2)')
-    .setDescription(`Một người dùng trên Website đang yêu cầu bật Minecraft Server!`)
+    .setTitle('[REQUEST] Yeu cau Bat Minecraft Server')
+    .setDescription(`Có người đang yêu cầu bật Minecraft Server`)
     .addFields(
-      { name: 'EC2 IP', value: `\`${publicIp || 'Unknown'}\``, inline: true },
+      { name: 'IP VPS', value: `\`${publicIp || 'Unknown'}\``, inline: true },
       { name: 'IP Nguoi yeu cau', value: `\`${requesterIp}\``, inline: true },
       { name: 'Quan ly qua', value: process.env.PUFFER_SERVER_ID ? 'PufferPanel API' : 'Direct Script', inline: true },
-      { name: 'Han phan hoi', value: '10 phút (Tự động hủy nếu không bấm)', inline: false }
+      { name: 'Han phan hoi', value: '10 phút', inline: false }
     )
     .setTimestamp()
-    .setFooter({ text: 'On-Demand EC2 Minecraft System' });
+    .setFooter({ text: 'hsowndev - Động Chim Giấy' });
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`approve_mc_${reqId}`)
-      .setLabel('Chap nhan (Start Server)')
+      .setLabel('Chap nhan')
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`reject_mc_${reqId}`)
@@ -643,8 +643,8 @@ async function sendMinecraftStartRequest({ requesterIp, publicIp }) {
       components: [row]
     });
   } catch (dmErr) {
-    console.error('Lỗi khi gửi tin nhắn riêng DM cho Admin:', dmErr);
-    throw new Error(`Không thể gửi DM tới Admin: ${dmErr.message}.`);
+    console.error('Lỗi khi gửi tin nhắn:', dmErr);
+    throw new Error(`Không thể gửi tin nhắn tới Admin: ${dmErr.message}.`);
   }
 
   return new Promise((resolve, reject) => {
@@ -653,9 +653,9 @@ async function sendMinecraftStartRequest({ requesterIp, publicIp }) {
       const expiredEmbed = EmbedBuilder.from(message.embeds[0])
         .setColor(0x7f8c8d)
         .setTitle('[EXPIRED] Yeu cau BAT Minecraft Server da HET HAN')
-        .setDescription('Không có phản hồi từ Admin sau 10 phút. Yêu cầu đã tự động hủy.');
-      await message.edit({ embeds: [expiredEmbed], components: [] }).catch(() => {});
-      setTimeout(() => message.delete().catch(() => {}), 5000);
+        .setDescription('Không có phản hồi từ Admin.');
+      await message.edit({ embeds: [expiredEmbed], components: [] }).catch(() => { });
+      setTimeout(() => message.delete().catch(() => { }), 5000);
       resolve({ status: 'timeout' });
     }, 10 * 60 * 1000);
 

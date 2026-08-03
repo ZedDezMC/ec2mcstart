@@ -9,7 +9,7 @@
 @font-face {
   font-family: 'DIN';
   src: url('fonts/din.otf') format('opentype'),
-       url('fonts/din.woff2') format('woff2');
+    url('fonts/din.woff2') format('woff2');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
@@ -55,7 +55,11 @@ body {
   overflow-x: hidden;
 }
 
-button, input, select, textarea, code {
+button,
+input,
+select,
+textarea,
+code {
   font-family: var(--font-body);
 }
 
@@ -586,7 +590,8 @@ button, input, select, textarea, code {
   align-items: center;
 }
 
-#blur-val-text, #overlay-val-text {
+#blur-val-text,
+#overlay-val-text {
   font-size: 0.85rem;
   color: #38bdf8;
   font-weight: 700;
