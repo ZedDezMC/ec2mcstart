@@ -1,0 +1,29 @@
+{
+  "name": "ec2-minecraft-on-demand",
+  "version": "1.0.0",
+  "description": "On-demand EC2 & Minecraft Server Starter Web App with Discord Bot approval and Captcha protection",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "aws",
+    "ec2",
+    "minecraft",
+    "discord-bot",
+    "turnstile",
+    "captcha"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-ec2": "^3.600.0",
+    "@aws-sdk/client-ssm": "^3.600.0",
+    "axios": "^1.7.2",
+    "cors": "^2.8.5",
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}
