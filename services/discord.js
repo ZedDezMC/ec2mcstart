@@ -14,6 +14,24 @@ let client = null;
 const pendingRequests = new Map(); // reqId -> { resolve, reject, message, timer }
 
 /**
+ * Nút điều khiển Chế độ Server (Dev Mode vs Normal Mode)
+ */
+function getModeActionRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('set_dev_mode')
+      .setLabel('Bật Dev Mode (Không tự tắt)')
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('🛠️'),
+    new ButtonBuilder()
+      .setCustomId('set_normal_mode')
+      .setLabel('Bật Normal Mode (Tự tắt sau 30p)')
+      .setStyle(ButtonStyle.Success)
+      .setEmoji('🟢')
+  );
+}
+
+/**
  * Khởi tạo Discord Bot Client
  */
 function initDiscordBot() {
@@ -26,7 +44,9 @@ function initDiscordBot() {
   client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
-      GatewayIntentBits.DirectMessages
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.DirectMessages,
+      GatewayIntentBits.MessageContent
     ],
     partials: [
       Partials.Channel,
@@ -38,11 +58,48 @@ function initDiscordBot() {
     console.log(`🤖 Discord Bot online với tên: ${client.user.tag}`);
   });
 
-  // Lắng nghe nút tương tác (Buttons) từ Admin (trực tiếp qua tin nhắn riêng DM)
+  // Lắng nghe nút tương tác (Buttons) từ Admin
   client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
 
     const customId = interaction.customId;
+
+    // 1. Thao tác Toggle Mode
+    if (customId === 'set_dev_mode') {
+      await interaction.deferReply();
+      const instanceId = process.env.EC2_INSTANCE_ID;
+      try {
+        await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py dev || sudo touch /opt/mc-autoshutdown/DEV_MODE');
+        const devEmbed = new EmbedBuilder()
+          .setColor(0x3498db)
+          .setTitle('🛠️ Chế độ Server: DEV MODE')
+          .setDescription('Đã kích hoạt **DEV MODE** thành công!\n\n📌 **Lưu ý:** Server EC2 sẽ **KHÔNG** tự động tắt dù 0 có người chơi online.')
+          .setTimestamp();
+        await interaction.editReply({ embeds: [devEmbed], components: [getModeActionRow()] });
+      } catch (err) {
+        await interaction.editReply({ content: `❌ Lỗi khi bật Dev Mode: ${err.message}` });
+      }
+      return;
+    }
+
+    if (customId === 'set_normal_mode') {
+      await interaction.deferReply();
+      const instanceId = process.env.EC2_INSTANCE_ID;
+      try {
+        await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py normal || sudo rm -f /opt/mc-autoshutdown/DEV_MODE');
+        const normalEmbed = new EmbedBuilder()
+          .setColor(0x2ecc71)
+          .setTitle('🟢 Chế độ Server: NORMAL MODE')
+          .setDescription('Đã kích hoạt **NORMAL MODE** thành công!\n\n📌 **Lưu ý:** Server EC2 sẽ **tự động tắt sau 30 phút** nếu không có người chơi nào online.')
+          .setTimestamp();
+        await interaction.editReply({ embeds: [normalEmbed], components: [getModeActionRow()] });
+      } catch (err) {
+        await interaction.editReply({ content: `❌ Lỗi khi bật Normal Mode: ${err.message}` });
+      }
+      return;
+    }
+
+    // 2. Thao tác Duyệt / Từ chối Bật Server
     if (!customId.startsWith('approve_mc_') && !customId.startsWith('reject_mc_')) return;
 
     const isApprove = customId.startsWith('approve_mc_');
@@ -135,6 +192,63 @@ function initDiscordBot() {
       setTimeout(() => {
         interaction.message.delete().catch(() => {});
       }, 5000);
+    }
+  });
+
+  // Lắng nghe tin nhắn văn bản (Message Command) từ Admin
+  client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+
+    const adminId = process.env.DISCORD_ADMIN_ID;
+    if (adminId && message.author.id !== adminId.trim()) return;
+
+    const content = message.content.trim().toLowerCase();
+
+    // Menu trợ giúp / điều khiển mode
+    if (['!mode', '!dev', '!help', '!server'].includes(content)) {
+      const embed = new EmbedBuilder()
+        .setColor(0xf1c40f)
+        .setTitle('⚙️ Quản lý Chế độ Server (Auto-Shutdown Control)')
+        .setDescription('Chọn chế độ hoạt động cho Server Minecraft:')
+        .addFields(
+          { name: '🛠️ Dev Mode (`!dev on` hoặc `!mode dev`)', value: 'Vô hiệu hóa tự động tắt VPS EC2. Server sẽ chạy liên tục để dev/test.', inline: false },
+          { name: '🟢 Normal Mode (`!dev off` hoặc `!mode normal`)', value: 'Bật tự động tắt VPS EC2 sau 30 phút 0 người chơi (Tiết kiệm chi phí AWS).', inline: false }
+        )
+        .setFooter({ text: 'Gõ !dev on / !dev off hoặc bấm nút bên dưới' });
+
+      return message.reply({ embeds: [embed], components: [getModeActionRow()] });
+    }
+
+    // Lệnh nhanh: Bật Dev Mode
+    if (['!mode dev', '!dev on', '!mode devmode'].includes(content)) {
+      const instanceId = process.env.EC2_INSTANCE_ID;
+      try {
+        await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py dev || sudo touch /opt/mc-autoshutdown/DEV_MODE');
+        const devEmbed = new EmbedBuilder()
+          .setColor(0x3498db)
+          .setTitle('🛠️ Đã chuyển sang DEV MODE!')
+          .setDescription('Tính năng tự động tắt server đã **VÔ HIỆU HÓA**.\nServer EC2 sẽ giữ trạng thái hoạt động liên tục.')
+          .setTimestamp();
+        return message.reply({ embeds: [devEmbed], components: [getModeActionRow()] });
+      } catch (err) {
+        return message.reply(`❌ Lỗi khi kích hoạt Dev Mode: ${err.message}`);
+      }
+    }
+
+    // Lệnh nhanh: Bật Normal Mode
+    if (['!mode normal', '!dev off', '!mode normalmode'].includes(content)) {
+      const instanceId = process.env.EC2_INSTANCE_ID;
+      try {
+        await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py normal || sudo rm -f /opt/mc-autoshutdown/DEV_MODE');
+        const normalEmbed = new EmbedBuilder()
+          .setColor(0x2ecc71)
+          .setTitle('🟢 Đã chuyển sang NORMAL MODE!')
+          .setDescription('Tính năng tự động tắt server đã **KÍCH HOẠT**.\nServer EC2 sẽ tự động tắt sau 30 phút không có người chơi online.')
+          .setTimestamp();
+        return message.reply({ embeds: [normalEmbed], components: [getModeActionRow()] });
+      } catch (err) {
+        return message.reply(`❌ Lỗi khi kích hoạt Normal Mode: ${err.message}`);
+      }
     }
   });
 
@@ -231,4 +345,5 @@ module.exports = {
   initDiscordBot,
   sendMinecraftStartRequest
 };
+
 
