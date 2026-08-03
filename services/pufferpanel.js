@@ -35,11 +35,11 @@ async function startPufferPanelServer(host, serverId, clientId, clientSecret) {
       }
     });
 
-    console.log(`✅ PufferPanel Server [${serverId}] đã nhận lệnh START thành công!`);
+    console.log(`[SUCCESS] PufferPanel Server [${serverId}] đã nhận lệnh START thành công!`);
     return { success: true, data: startRes.data };
 
   } catch (error) {
-    console.error('❌ Lỗi khi gọi PufferPanel API:', error.response?.data || error.message);
+    console.error('[ERROR] Lỗi khi gọi PufferPanel API:', error.response?.data || error.message);
     throw new Error(`PufferPanel Error: ${error.response?.data?.error || error.message}`);
   }
 }

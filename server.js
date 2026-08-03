@@ -28,7 +28,7 @@ async function verifyCaptcha(token, remoteIp) {
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
   // Nếu chưa cấu hình Secret Key (ví dụ thử nghiệm local), cho phép bỏ qua
   if (!secretKey || secretKey.includes('XXXXXXXX')) {
-    console.warn('⚠️ Cloudflare Turnstile Secret Key chưa được cấu hình, bỏ qua xác thực Captcha.');
+    console.warn('[WARN] Cloudflare Turnstile Secret Key chưa được cấu hình, bỏ qua xác thực Captcha.');
     return true;
   }
 
@@ -178,5 +178,5 @@ app.post('/api/request-mc-start', async (req, res) => {
 
 // Khởi chạy Server
 app.listen(PORT, () => {
-  console.log(`🚀 Server dang chay tai: http://localhost:${PORT}`);
+  console.log(`[INFO] Server dang chay tai: http://localhost:${PORT}`);
 });

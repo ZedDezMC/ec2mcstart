@@ -20,14 +20,12 @@ function getModeActionRow() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('set_dev_mode')
-      .setLabel('Bật Dev Mode (Không tự tắt)')
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('🛠️'),
+      .setLabel('Bat Dev Mode (Khong tu tat)')
+      .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('set_normal_mode')
-      .setLabel('Bật Normal Mode (Tự tắt sau 30p)')
+      .setLabel('Bat Normal Mode (Tu tat sau 30p)')
       .setStyle(ButtonStyle.Success)
-      .setEmoji('🟢')
   );
 }
 
@@ -37,7 +35,7 @@ function getModeActionRow() {
 function initDiscordBot() {
   const token = process.env.DISCORD_BOT_TOKEN;
   if (!token || token.includes('XXXXXX')) {
-    console.warn('⚠️ [Discord Bot] DISCORD_BOT_TOKEN chưa được cấu hình trong .env');
+    console.warn('[Discord Bot] DISCORD_BOT_TOKEN chưa được cấu hình trong .env');
     return;
   }
 
@@ -55,7 +53,7 @@ function initDiscordBot() {
   });
 
   client.once('ready', () => {
-    console.log(`🤖 Discord Bot online với tên: ${client.user.tag}`);
+    console.log(`[Discord Bot] Bot online với tên: ${client.user.tag}`);
   });
 
   // Lắng nghe nút tương tác (Buttons) từ Admin
@@ -72,12 +70,12 @@ function initDiscordBot() {
         await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py dev || sudo touch /opt/mc-autoshutdown/DEV_MODE');
         const devEmbed = new EmbedBuilder()
           .setColor(0x3498db)
-          .setTitle('🛠️ Chế độ Server: DEV MODE')
-          .setDescription('Đã kích hoạt **DEV MODE** thành công!\n\n📌 **Lưu ý:** Server EC2 sẽ **KHÔNG** tự động tắt dù 0 có người chơi online.')
+          .setTitle('[DEV MODE] Che do Server: DEV MODE')
+          .setDescription('Đã kích hoạt **DEV MODE** thành công!\n\nLưu ý: Server EC2 sẽ **KHÔNG** tự động tắt dù 0 có người chơi online.')
           .setTimestamp();
         await interaction.editReply({ embeds: [devEmbed], components: [getModeActionRow()] });
       } catch (err) {
-        await interaction.editReply({ content: `❌ Lỗi khi bật Dev Mode: ${err.message}` });
+        await interaction.editReply({ content: `[ERROR] Lỗi khi bật Dev Mode: ${err.message}` });
       }
       return;
     }
@@ -89,12 +87,12 @@ function initDiscordBot() {
         await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py normal || sudo rm -f /opt/mc-autoshutdown/DEV_MODE');
         const normalEmbed = new EmbedBuilder()
           .setColor(0x2ecc71)
-          .setTitle('🟢 Chế độ Server: NORMAL MODE')
-          .setDescription('Đã kích hoạt **NORMAL MODE** thành công!\n\n📌 **Lưu ý:** Server EC2 sẽ **tự động tắt sau 30 phút** nếu không có người chơi nào online.')
+          .setTitle('[NORMAL MODE] Che do Server: NORMAL MODE')
+          .setDescription('Đã kích hoạt **NORMAL MODE** thành công!\n\nLưu ý: Server EC2 sẽ **tự động tắt sau 30 phút** nếu không có người chơi nào online.')
           .setTimestamp();
         await interaction.editReply({ embeds: [normalEmbed], components: [getModeActionRow()] });
       } catch (err) {
-        await interaction.editReply({ content: `❌ Lỗi khi bật Normal Mode: ${err.message}` });
+        await interaction.editReply({ content: `[ERROR] Lỗi khi bật Normal Mode: ${err.message}` });
       }
       return;
     }
@@ -108,7 +106,7 @@ function initDiscordBot() {
     const requestData = pendingRequests.get(reqId);
     if (!requestData) {
       return interaction.reply({ 
-        content: '⚠️ Yêu cầu này đã hết hạn hoặc không còn tồn tại.', 
+        content: '[WARN] Yêu cầu này đã hết hạn hoặc không còn tồn tại.', 
         ephemeral: true 
       });
     }
@@ -125,10 +123,10 @@ function initDiscordBot() {
       // Cập nhật Embed thành màu Xanh (Đã duyệt)
       const approvedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
         .setColor(0x2ecc71)
-        .setTitle('✅ Yêu cầu BẬT Minecraft Server đã ĐƯỢC CHẤP NHẬN')
+        .setTitle('[APPROVED] Yeu cau BAT Minecraft Server da DUOC CHAP NHAN')
         .setDescription(`Admin **${adminUser}** đã phê duyệt yêu cầu!\nHệ thống đang khởi động Minecraft Server...`)
         .setFields(
-          { name: 'Trạng thái', value: '🟢 Đã kích hoạt lệnh khởi động', inline: true },
+          { name: 'Trạng thái', value: 'Đã kích hoạt lệnh khởi động', inline: true },
           { name: 'Thời gian duyệt', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
         );
 
@@ -143,7 +141,7 @@ function initDiscordBot() {
         const pufferPort = process.env.PUFFER_PORT || '8080';
 
         if (pufferServerId && pufferClientId && pufferClientSecret) {
-          console.log('🎮 Phát hiện cấu hình PufferPanel! Đang kích hoạt qua PufferPanel API...');
+          console.log('[PufferPanel] Phát hiện cấu hình PufferPanel! Đang kích hoạt qua PufferPanel API...');
           
           // Chạy lệnh curl PufferPanel API trực tiếp trên VPS qua SSM
           const ssmPufferCmd = generatePufferPanelSSMCommand(
@@ -177,10 +175,10 @@ function initDiscordBot() {
       // Cập nhật Embed thành màu Đỏ (Từ chối)
       const rejectedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
         .setColor(0xe74c3c)
-        .setTitle('❌ Yêu cầu BẬT Minecraft Server bị TỪ CHỐI')
+        .setTitle('[REJECTED] Yeu cau BAT Minecraft Server bi TU CHOI')
         .setDescription(`Admin **${adminUser}** đã từ chối yêu cầu bật server.`)
         .setFields(
-          { name: 'Trạng thái', value: '🔴 Đã từ chối', inline: true },
+          { name: 'Trạng thái', value: 'Đã từ chối', inline: true },
           { name: 'Thời gian', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
         );
 
@@ -208,11 +206,11 @@ function initDiscordBot() {
     if (['!mode', '!dev', '!help', '!server'].includes(content)) {
       const embed = new EmbedBuilder()
         .setColor(0xf1c40f)
-        .setTitle('⚙️ Quản lý Chế độ Server (Auto-Shutdown Control)')
+        .setTitle('[CONFIG] Quan ly Che do Server (Auto-Shutdown Control)')
         .setDescription('Chọn chế độ hoạt động cho Server Minecraft:')
         .addFields(
-          { name: '🛠️ Dev Mode (`!dev on` hoặc `!mode dev`)', value: 'Vô hiệu hóa tự động tắt VPS EC2. Server sẽ chạy liên tục để dev/test.', inline: false },
-          { name: '🟢 Normal Mode (`!dev off` hoặc `!mode normal`)', value: 'Bật tự động tắt VPS EC2 sau 30 phút 0 người chơi (Tiết kiệm chi phí AWS).', inline: false }
+          { name: 'Dev Mode (`!dev on` hoặc `!mode dev`)', value: 'Vô hiệu hóa tự động tắt VPS EC2. Server sẽ chạy liên tục để dev/test.', inline: false },
+          { name: 'Normal Mode (`!dev off` hoặc `!mode normal`)', value: 'Bật tự động tắt VPS EC2 sau 30 phút 0 người chơi (Tiết kiệm chi phí AWS).', inline: false }
         )
         .setFooter({ text: 'Gõ !dev on / !dev off hoặc bấm nút bên dưới' });
 
@@ -226,12 +224,12 @@ function initDiscordBot() {
         await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py dev || sudo touch /opt/mc-autoshutdown/DEV_MODE');
         const devEmbed = new EmbedBuilder()
           .setColor(0x3498db)
-          .setTitle('🛠️ Đã chuyển sang DEV MODE!')
+          .setTitle('[DEV MODE] Da chuyen sang DEV MODE!')
           .setDescription('Tính năng tự động tắt server đã **VÔ HIỆU HÓA**.\nServer EC2 sẽ giữ trạng thái hoạt động liên tục.')
           .setTimestamp();
         return message.reply({ embeds: [devEmbed], components: [getModeActionRow()] });
       } catch (err) {
-        return message.reply(`❌ Lỗi khi kích hoạt Dev Mode: ${err.message}`);
+        return message.reply(`[ERROR] Lỗi khi kích hoạt Dev Mode: ${err.message}`);
       }
     }
 
@@ -242,18 +240,18 @@ function initDiscordBot() {
         await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py normal || sudo rm -f /opt/mc-autoshutdown/DEV_MODE');
         const normalEmbed = new EmbedBuilder()
           .setColor(0x2ecc71)
-          .setTitle('🟢 Đã chuyển sang NORMAL MODE!')
+          .setTitle('[NORMAL MODE] Da chuyen sang NORMAL MODE!')
           .setDescription('Tính năng tự động tắt server đã **KÍCH HOẠT**.\nServer EC2 sẽ tự động tắt sau 30 phút không có người chơi online.')
           .setTimestamp();
         return message.reply({ embeds: [normalEmbed], components: [getModeActionRow()] });
       } catch (err) {
-        return message.reply(`❌ Lỗi khi kích hoạt Normal Mode: ${err.message}`);
+        return message.reply(`[ERROR] Lỗi khi kích hoạt Normal Mode: ${err.message}`);
       }
     }
   });
 
   client.login(token).catch(err => {
-    console.error('❌ Không thể đăng nhập Discord Bot:', err.message);
+    console.error('[Discord Bot] Không thể đăng nhập Discord Bot:', err.message);
   });
 }
 
@@ -280,13 +278,13 @@ async function sendMinecraftStartRequest({ requesterIp, publicIp }) {
 
   const embed = new EmbedBuilder()
     .setColor(0xf1c40f)
-    .setTitle('🎮 Yêu cầu Bật Minecraft Server (PufferPanel / EC2)')
+    .setTitle('[REQUEST] Yeu cau Bat Minecraft Server (PufferPanel / EC2)')
     .setDescription(`Một người dùng trên Website đang yêu cầu bật Minecraft Server!`)
     .addFields(
-      { name: '🌐 EC2 IP', value: `\`${publicIp || 'Unknown'}\``, inline: true },
-      { name: '👤 IP Người yêu cầu', value: `\`${requesterIp}\``, inline: true },
-      { name: '⚙️ Quản lý qua', value: process.env.PUFFER_SERVER_ID ? 'PufferPanel API' : 'Direct Script', inline: true },
-      { name: '⏳ Hạn phản hồi', value: '10 phút (Tự động hủy nếu không bấm)', inline: false }
+      { name: 'EC2 IP', value: `\`${publicIp || 'Unknown'}\``, inline: true },
+      { name: 'IP Nguoi yeu cau', value: `\`${requesterIp}\``, inline: true },
+      { name: 'Quan ly qua', value: process.env.PUFFER_SERVER_ID ? 'PufferPanel API' : 'Direct Script', inline: true },
+      { name: 'Han phan hoi', value: '10 phút (Tự động hủy nếu không bấm)', inline: false }
     )
     .setTimestamp()
     .setFooter({ text: 'On-Demand EC2 Minecraft System' });
@@ -294,21 +292,19 @@ async function sendMinecraftStartRequest({ requesterIp, publicIp }) {
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`approve_mc_${reqId}`)
-      .setLabel('Chấp nhận (Start Server)')
-      .setStyle(ButtonStyle.Success)
-      .setEmoji('✅'),
+      .setLabel('Chap nhan (Start Server)')
+      .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`reject_mc_${reqId}`)
-      .setLabel('Từ chối')
+      .setLabel('Tu choi')
       .setStyle(ButtonStyle.Danger)
-      .setEmoji('✖️')
   );
 
   // Gửi tin nhắn riêng (DM) tới Admin
   let message;
   try {
     message = await adminUser.send({
-      content: `🔔 Có yêu cầu bật Minecraft Server mới!`,
+      content: `[NOTIFICATION] Co yeu cau bat Minecraft Server moi!`,
       embeds: [embed],
       components: [row]
     });
@@ -324,9 +320,9 @@ async function sendMinecraftStartRequest({ requesterIp, publicIp }) {
 
       const expiredEmbed = EmbedBuilder.from(message.embeds[0])
         .setColor(0x7f8c8d)
-        .setTitle('⏰ Yêu cầu BẬT Minecraft Server đã HẾT HẠN')
+        .setTitle('[EXPIRED] Yeu cau BAT Minecraft Server da HET HAN')
         .setDescription('Không có phản hồi từ Admin sau 10 phút. Yêu cầu đã tự động hủy.')
-        .setFields({ name: 'Trạng thái', value: '⚪ Hết hạn (Expired)', inline: true });
+        .setFields({ name: 'Trạng thái', value: 'Hết hạn (Expired)', inline: true });
 
       await message.edit({ embeds: [expiredEmbed], components: [] }).catch(() => {});
 
@@ -345,5 +341,3 @@ module.exports = {
   initDiscordBot,
   sendMinecraftStartRequest
 };
-
-
