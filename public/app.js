@@ -31,6 +31,14 @@ document.addEventListener('DOMContentLoaded', () => {
   let turnstileSiteKey = '';
   let isWaitingApproval = false;
 
+  // 5-Minute Lock State Variables for btnRequestMc
+  let lock5MinInterval = null;
+  const LOCK_DURATION_MS = 5 * 60 * 1000; // 5 phút = 300,000 ms
+
+  const requestMcDesc = document.getElementById('request-mc-desc');
+  const btnRequestMcIcon = document.getElementById('btn-request-mc-icon');
+  const btnRequestMcText = document.getElementById('btn-request-mc-text');
+
   // Initial Fetch
   fetchStatus();
 
@@ -79,6 +87,9 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(data.error || 'Khởi động thất bại');
       }
 
+      // Lưu mốc thời gian bắt đầu bật VPS vào localStorage để khóa nút 5 phút
+      localStorage.setItem('vps_start_time', Date.now().toString());
+
       showToast('🚀 ' + (data.message || 'Đang khởi động VPS EC2...'));
       fetchStatus();
 
@@ -91,6 +102,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Request Minecraft Start Button Click
   btnRequestMc.addEventListener('click', async () => {
+    if (btnRequestMc.disabled) return;
+
     isWaitingApproval = true;
     showSection(sectionWaitingApproval);
     start10MinCountdown();
@@ -155,6 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Determine UI Section
       if (data.ec2State === 'stopped') {
+        clear5MinLock();
         showSection(sectionStartEc2);
         initTurnstile(data.turnstileSiteKey);
       } else if (data.ec2State === 'pending') {
@@ -162,14 +176,90 @@ document.addEventListener('DOMContentLoaded', () => {
         animateProgressBar();
       } else if (data.ec2State === 'running') {
         if (data.mcOnline) {
+          clear5MinLock();
           showSection(sectionOnline);
         } else {
           showSection(sectionRequestMc);
+          checkAndApply5MinLock();
         }
       }
     } catch (err) {
       if (!isBackground) console.error('Error fetching status:', err);
     }
+  }
+
+  /**
+   * Kiểm tra & Áp dụng khóa nút 5 phút nếu VPS vừa được bấm bật
+   */
+  function checkAndApply5MinLock() {
+    const startTimeStr = localStorage.getItem('vps_start_time');
+    if (!startTimeStr) {
+      unlockRequestMcButton();
+      return;
+    }
+
+    const startTime = parseInt(startTimeStr, 10);
+    const elapsed = Date.now() - startTime;
+    const remainingMs = LOCK_DURATION_MS - elapsed;
+
+    if (remainingMs <= 0) {
+      clear5MinLock();
+      unlockRequestMcButton();
+      return;
+    }
+
+    // Đang trong thời gian 5 phút khóa
+    lockRequestMcButton(remainingMs);
+  }
+
+  function lockRequestMcButton(remainingMs) {
+    btnRequestMc.disabled = true;
+    if (btnRequestMcIcon) btnRequestMcIcon.textContent = '🔒';
+
+    updateLockTimerText(remainingMs);
+
+    clearInterval(lock5MinInterval);
+    lock5MinInterval = setInterval(() => {
+      const startTime = parseInt(localStorage.getItem('vps_start_time') || '0', 10);
+      const rem = LOCK_DURATION_MS - (Date.now() - startTime);
+
+      if (rem <= 0) {
+        clear5MinLock();
+        unlockRequestMcButton();
+        showToast('🔓 Nút đã mở! Nếu server chưa tự bật, bạn có thể gửi yêu cầu cho Admin.');
+      } else {
+        updateLockTimerText(rem);
+      }
+    }, 1000);
+  }
+
+  function updateLockTimerText(remMs) {
+    const sec = Math.ceil(remMs / 1000);
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    
+    if (btnRequestMcText) {
+      btnRequestMcText.textContent = `Tự Động Bật (Khóa Nút Trong ${m}:${s})`;
+    }
+    if (requestMcDesc) {
+      requestMcDesc.textContent = `VPS vừa bật. Vui lòng chờ server tự khởi động (khóa nút ${m}:${s}). Nếu sau 5 phút server chưa tự chạy, nút sẽ mở để bạn gửi thông báo cho Admin.`;
+    }
+  }
+
+  function unlockRequestMcButton() {
+    clearInterval(lock5MinInterval);
+    btnRequestMc.disabled = false;
+    if (btnRequestMcIcon) btnRequestMcIcon.textContent = '💬';
+    if (btnRequestMcText) btnRequestMcText.textContent = 'Gửi Yêu Cầu Bật Minecraft (Qua Discord)';
+    if (requestMcDesc) {
+      requestMcDesc.textContent = 'Vui lòng chờ server tự khởi động hoặc bấm nút bên dưới để gửi thông báo đến Discord của Admin phê duyệt bật Minecraft Server.';
+    }
+  }
+
+  function clear5MinLock() {
+    clearInterval(lock5MinInterval);
+    lock5MinInterval = null;
+    localStorage.removeItem('vps_start_time');
   }
 
   /**
