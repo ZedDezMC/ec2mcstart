@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // Elements
+  // Status Elements
   const ec2StatusBadge = document.getElementById('ec2-status');
   const mcStatusBadge = document.getElementById('mc-status');
   const ipContainer = document.getElementById('ip-container');
@@ -16,12 +16,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const sectionOnline = document.getElementById('section-online');
   const captchaWrapper = document.getElementById('captcha-container');
 
-  // Buttons
+  // Action Buttons
   const btnStartEc2 = document.getElementById('btn-start-ec2');
   const btnRequestMc = document.getElementById('btn-request-mc');
   const countdownTimerEl = document.getElementById('countdown-timer');
   const progressBarEl = document.getElementById('progress-bar');
   const toastEl = document.getElementById('toast-message');
+
+  // Background & Blur Settings Elements
+  const bgCustomLayer = document.getElementById('bg-custom-layer');
+  const bgOverlayLayer = document.getElementById('bg-overlay-layer');
+  const btnOpenBlurSettings = document.getElementById('btn-open-blur-settings');
+  const btnCloseBlur = document.getElementById('btn-close-blur');
+  const blurModal = document.getElementById('blur-modal');
+  const sliderBlur = document.getElementById('slider-blur');
+  const blurValText = document.getElementById('blur-val-text');
+  const sliderOverlay = document.getElementById('slider-overlay');
+  const overlayValText = document.getElementById('overlay-val-text');
+  const btnResetBlur = document.getElementById('btn-reset-blur');
 
   // State Variables
   let currentCaptchaToken = null;
@@ -31,13 +43,94 @@ document.addEventListener('DOMContentLoaded', () => {
   let turnstileSiteKey = '';
   let isWaitingApproval = false;
 
-  // 5-Minute Lock State Variables for btnRequestMc
+  // 5-Minute Lock State Variables
   let lock5MinInterval = null;
   const LOCK_DURATION_MS = 5 * 60 * 1000; // 5 phút = 300,000 ms
 
   const requestMcDesc = document.getElementById('request-mc-desc');
   const btnRequestMcIcon = document.getElementById('btn-request-mc-icon');
   const btnRequestMcText = document.getElementById('btn-request-mc-text');
+
+  // ----------------------------------------------------
+  // BACKGROUND BLUR & OVERLAY CONTROL LOGIC
+  // ----------------------------------------------------
+  initBlurSettings();
+
+  function initBlurSettings() {
+    const savedBlur = localStorage.getItem('user_bg_blur') || '6';
+    const savedOverlay = localStorage.getItem('user_bg_overlay') || '55';
+
+    applyBlur(savedBlur);
+    applyOverlay(savedOverlay);
+
+    // Open Modal
+    btnOpenBlurSettings.addEventListener('click', () => {
+      blurModal.classList.remove('hidden');
+    });
+
+    // Close Modal
+    btnCloseBlur.addEventListener('click', () => {
+      blurModal.classList.add('hidden');
+    });
+
+    blurModal.addEventListener('click', (e) => {
+      if (e.target === blurModal) {
+        blurModal.classList.add('hidden');
+      }
+    });
+
+    // Blur Slider Change
+    sliderBlur.addEventListener('input', (e) => {
+      const val = e.target.value;
+      applyBlur(val);
+      localStorage.setItem('user_bg_blur', val);
+    });
+
+    // Overlay Slider Change
+    sliderOverlay.addEventListener('input', (e) => {
+      const val = e.target.value;
+      applyOverlay(val);
+      localStorage.setItem('user_bg_overlay', val);
+    });
+
+    // Reset Button
+    btnResetBlur.addEventListener('click', () => {
+      applyBlur('6');
+      applyOverlay('55');
+      localStorage.removeItem('user_bg_blur');
+      localStorage.removeItem('user_bg_overlay');
+      showToast('Đã khôi phục cài đặt độ mờ mặc định!');
+    });
+  }
+
+  function applyBlur(pxVal) {
+    if (bgCustomLayer) {
+      bgCustomLayer.style.filter = `blur(${pxVal}px)`;
+    }
+    if (blurValText) {
+      blurValText.textContent = `${pxVal}px`;
+    }
+    if (sliderBlur) {
+      sliderBlur.value = pxVal;
+    }
+  }
+
+  function applyOverlay(opacityPercent) {
+    const opacityDec = parseInt(opacityPercent, 10) / 100;
+    if (bgOverlayLayer) {
+      bgOverlayLayer.style.background = `rgba(15, 23, 42, ${opacityDec})`;
+    }
+    if (overlayValText) {
+      overlayValText.textContent = `${opacityPercent}%`;
+    }
+    if (sliderOverlay) {
+      sliderOverlay.value = opacityPercent;
+    }
+  }
+
+  // ----------------------------------------------------
+  // SYSTEM STATUS & ACTIONS LOGIC
+  // ----------------------------------------------------
 
   // Initial Fetch
   fetchStatus();
@@ -90,11 +183,11 @@ document.addEventListener('DOMContentLoaded', () => {
       // Lưu mốc thời gian bắt đầu bật VPS vào localStorage để khóa nút 5 phút
       localStorage.setItem('vps_start_time', Date.now().toString());
 
-      showToast('🚀 ' + (data.message || 'Đang khởi động VPS EC2...'));
+      showToast('[INFO] ' + (data.message || 'Đang khởi động VPS EC2...'));
       fetchStatus();
 
     } catch (err) {
-      showToast('❌ ' + err.message);
+      showToast('[ERROR] ' + err.message);
       showSection(sectionStartEc2);
       resetCaptcha();
     }
@@ -119,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
       isWaitingApproval = false;
 
       if (res.ok && data.status === 'approved') {
-        showToast('🎉 Admin đã duyệt! Đang bật Minecraft Server...');
+        showToast('[SUCCESS] Admin đã duyệt! Đang bật Minecraft Server...');
         showSection(sectionStarting);
         document.getElementById('starting-title').textContent = 'Đang Bật Minecraft Server qua AWS SSM...';
         setTimeout(() => fetchStatus(), 5000);
@@ -129,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       stop10MinCountdown();
       isWaitingApproval = false;
-      showToast('❌ ' + err.message);
+      showToast('[ERROR] ' + err.message);
       fetchStatus();
     }
   });
@@ -214,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function lockRequestMcButton(remainingMs) {
     btnRequestMc.disabled = true;
-    if (btnRequestMcIcon) btnRequestMcIcon.textContent = '🔒';
+    if (btnRequestMcIcon) btnRequestMcIcon.textContent = '[LOCKED]';
 
     updateLockTimerText(remainingMs);
 
@@ -226,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (rem <= 0) {
         clear5MinLock();
         unlockRequestMcButton();
-        showToast('🔓 Nút đã mở! Nếu server chưa tự bật, bạn có thể gửi yêu cầu cho Admin.');
+        showToast('[INFO] Nút đã mở! Nếu server chưa tự bật, bạn có thể gửi yêu cầu cho Admin.');
       } else {
         updateLockTimerText(rem);
       }

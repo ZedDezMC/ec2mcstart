@@ -28,7 +28,7 @@ async function verifyCaptcha(token, remoteIp) {
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
   // Nếu chưa cấu hình Secret Key (ví dụ thử nghiệm local), cho phép bỏ qua
   if (!secretKey || secretKey.includes('XXXXXXXX')) {
-    console.warn('[WARN] Cloudflare Turnstile Secret Key chưa được cấu hình, bỏ qua xác thực Captcha.');
+    console.warn('[WARN] no key, skip captcha.');
     return true;
   }
 
@@ -48,7 +48,7 @@ async function verifyCaptcha(token, remoteIp) {
 
     return response.data && response.data.success === true;
   } catch (error) {
-    console.error('Lỗi xác thực Captcha:', error.message);
+    console.error('captcha err:', error.message);
     return false;
   }
 }
@@ -60,7 +60,7 @@ app.get('/api/status', async (req, res) => {
   try {
     if (!INSTANCE_ID || INSTANCE_ID.includes('i-0123456789')) {
       return res.status(500).json({
-        error: 'EC2_INSTANCE_ID chưa được cấu hình đúng trong .env'
+        error: 'instance id failed'
       });
     }
 
@@ -90,7 +90,7 @@ app.get('/api/status', async (req, res) => {
       turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || ''
     });
   } catch (error) {
-    res.status(500).json({ error: error.message || 'Lỗi khi kiểm tra trạng thái' });
+    res.status(500).json({ error: error.message || 'status failed' });
   }
 });
 
@@ -105,16 +105,16 @@ app.post('/api/start-ec2', async (req, res) => {
     // 1. Xác thực Captcha
     const isCaptchaValid = await verifyCaptcha(captchaToken, clientIp);
     if (!isCaptchaValid) {
-      return res.status(400).json({ error: 'Mã Captcha không hợp lệ hoặc đã hết hạn! Vui lòng thử lại.' });
+      return res.status(400).json({ error: 'expired captcha.' });
     }
 
     // 2. Kiểm tra trạng thái EC2 hiện tại
     const currentStatus = await getInstanceStatus(INSTANCE_ID);
     if (currentStatus.state === 'running') {
-      return res.json({ message: 'EC2 Instance hiện đã và đang chạy rồi!', state: 'running' });
+      return res.json({ message: 'still run vps', state: 'running' });
     }
     if (currentStatus.state === 'pending') {
-      return res.json({ message: 'EC2 Instance đang trong quá trình khởi động...', state: 'pending' });
+      return res.json({ message: 'still starting vps', state: 'pending' });
     }
 
     // 3. Khởi động EC2 Instance

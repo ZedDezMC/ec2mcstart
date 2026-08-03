@@ -1,7 +1,24 @@
+@font-face {
+  font-family: 'ZHCN';
+  src: url('fonts/zhcn.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DIN';
+  src: url('fonts/din.otf') format('opentype'),
+       url('fonts/din.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg-dark: #0f172a;
-  --card-bg: rgba(30, 41, 59, 0.7);
-  --card-border: rgba(255, 255, 255, 0.1);
+  --card-bg: rgba(30, 41, 59, 0.75);
+  --card-border: rgba(255, 255, 255, 0.12);
   --primary-glow: rgba(56, 189, 248, 0.15);
 
   --text-main: #f8fafc;
@@ -13,14 +30,15 @@
   --color-blue: #3b82f6;
   --color-discord: #5865f2;
 
-  --font-heading: 'Outfit', sans-serif;
-  --font-body: 'Inter', sans-serif;
+  --font-heading: 'ZHCN', 'DIN', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'ZHCN', 'DIN', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  font-family: var(--font-body);
 }
 
 body {
@@ -35,6 +53,41 @@ body {
   padding: 1.5rem;
   position: relative;
   overflow-x: hidden;
+}
+
+button, input, select, textarea, code {
+  font-family: var(--font-body);
+}
+
+/* Background Layer (Admin Preset Background Image) */
+.bg-custom-layer {
+  position: fixed;
+  top: -10px;
+  left: -10px;
+  width: calc(100vw + 20px);
+  height: calc(100vh + 20px);
+  /* Hình nền do Admin đặt trước */
+  background-image: url('/backgrounds/sunset.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(6px);
+  transform: scale(1.05);
+  z-index: -2;
+  transition: filter 0.2s ease;
+}
+
+/* Dark Overlay Layer */
+.bg-overlay-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: -1;
+  pointer-events: none;
+  transition: background 0.2s ease;
 }
 
 /* Background Glow Effects */
@@ -64,41 +117,72 @@ body {
   text-align: center;
 }
 
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 0.4rem;
+}
+
 .logo {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.75rem;
 }
 
 .logo .icon {
-  font-size: 2.2rem;
+  font-size: 2rem;
 }
 
 .logo h1 {
   font-family: var(--font-heading);
-  font-size: 2rem;
+  font-size: 1.8rem;
   font-weight: 800;
   background: linear-gradient(135deg, #38bdf8 0%, #a855f7 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
+.btn-wallpaper {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--card-border);
+  color: var(--text-main);
+  padding: 0.45rem 0.9rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
+.btn-wallpaper:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  transform: translateY(-1px);
+}
+
 .subtitle {
   color: var(--text-muted);
   font-size: 0.95rem;
-  margin-top: 0.4rem;
+  margin-top: 0.2rem;
 }
 
 /* Glass Cards */
 .glass-card {
   background: var(--card-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   border: 1px solid var(--card-border);
   border-radius: 20px;
   padding: 1.75rem;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
 .card-header {
@@ -234,7 +318,7 @@ body {
 }
 
 .ip-box code {
-  font-family: monospace;
+  font-family: 'ZHCN', 'DIN', monospace;
   font-size: 1.05rem;
   color: #38bdf8;
   font-weight: 700;
@@ -291,7 +375,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  transition: all 0.25 ease;
+  transition: all 0.25s ease;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
@@ -338,7 +422,8 @@ body {
 }
 
 .alert-icon {
-  font-size: 1.4rem;
+  font-size: 1.2rem;
+  font-weight: bold;
 }
 
 /* Loading & Progress */
@@ -411,15 +496,17 @@ body {
 }
 
 .timer-display {
-  font-family: monospace;
+  font-family: 'ZHCN', 'DIN', monospace;
   font-size: 1.8rem;
   font-weight: 800;
   color: #fbbf24;
 }
 
 .success-badge {
-  font-size: 3rem;
+  font-size: 1.5rem;
+  font-weight: bold;
   margin-bottom: 0.5rem;
+  color: #34d399;
 }
 
 .success-title {
@@ -440,6 +527,99 @@ body {
   font-size: 0.9rem;
   font-weight: 600;
   z-index: 100;
+}
+
+/* Modal Customizer */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 440px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid var(--card-border);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.modal-header h3 {
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.wallpaper-section {
+  margin-bottom: 1.25rem;
+}
+
+.section-label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#blur-val-text, #overlay-val-text {
+  font-size: 0.85rem;
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+.range-slider {
+  width: 100%;
+  accent-color: #38bdf8;
+  cursor: pointer;
+  margin-top: 0.4rem;
+}
+
+.modal-footer {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-reset {
+  background: transparent;
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-reset:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .hidden {

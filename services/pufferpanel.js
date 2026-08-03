@@ -10,7 +10,7 @@ const axios = require('axios');
 async function startPufferPanelServer(host, serverId, clientId, clientSecret) {
   try {
     const baseUrl = host.startsWith('http') ? host : `http://${host}:8080`;
-    
+
     // 1. Lấy OAuth2 Access Token từ PufferPanel
     const tokenUrl = `${baseUrl}/oauth2/token`;
     const params = new URLSearchParams();
@@ -24,7 +24,7 @@ async function startPufferPanelServer(host, serverId, clientId, clientSecret) {
 
     const accessToken = tokenRes.data.access_token;
     if (!accessToken) {
-      throw new Error('Không lấy được access_token từ PufferPanel OAuth2');
+      throw new Error('cant get access token');
     }
 
     // 2. Gửi yêu cầu START Server đến PufferPanel API
@@ -35,12 +35,12 @@ async function startPufferPanelServer(host, serverId, clientId, clientSecret) {
       }
     });
 
-    console.log(`[SUCCESS] PufferPanel Server [${serverId}] đã nhận lệnh START thành công!`);
+    console.log(`[SUCCESS] start success [${serverId}]`);
     return { success: true, data: startRes.data };
 
   } catch (error) {
-    console.error('[ERROR] Lỗi khi gọi PufferPanel API:', error.response?.data || error.message);
-    throw new Error(`PufferPanel Error: ${error.response?.data?.error || error.message}`);
+    console.error('[ERROR] error call:', error.response?.data || error.message);
+    throw new Error(`panel error: ${error.response?.data?.error || error.message}`);
   }
 }
 
