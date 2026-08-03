@@ -17,6 +17,7 @@ const { generatePufferPanelSSMCommand } = require('./pufferpanel');
 
 let client = null;
 const pendingRequests = new Map(); // reqId -> { resolve, reject, message, timer }
+let currentMode = 'normal'; // Mode hiện tại: 'normal' hoặc 'dev'
 
 /**
  * Kiểm tra xem người dùng có quyền Admin hoặc có Role ID được phép hay không
@@ -51,40 +52,67 @@ function isAuthorized(member, user) {
 }
 
 /**
- * Tạo Hàng Nút Bấm Điều Khiển (Interactive Dashboard Action Rows)
+ * Tạo Hàng Nút Bấm Điều Khiển Theo Trạng Thái & Chế Độ (Interactive Dashboard Action Rows)
+ * @param {string} ec2State Trạng thái VPS ('stopped' | 'pending' | 'running' | 'stopping')
+ * @param {string} mode Chế độ hiện tại ('normal' | 'dev')
  */
-function getDashboardActionRows() {
-  const row1 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('start_server')
-      .setLabel('Start VPS & MC')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId('stop_server')
-      .setLabel('Stop VPS & MC')
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId('restart_server')
-      .setLabel('Restart MC')
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId('refresh_status')
-      .setLabel('Refresh')
-      .setStyle(ButtonStyle.Primary)
-  );
+function getDashboardActionRows(ec2State, mode = currentMode) {
+  const state = (ec2State || '').toLowerCase();
 
-  const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('set_dev_mode')
-      .setLabel('Dev Mode')
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId('set_normal_mode')
-      .setLabel('Normal Mode')
-      .setStyle(ButtonStyle.Success)
-  );
+  const btnStart = new ButtonBuilder()
+    .setCustomId('start_server')
+    .setLabel('Start VPS & MC')
+    .setStyle(ButtonStyle.Success);
 
-  return [row1, row2];
+  const btnStop = new ButtonBuilder()
+    .setCustomId('stop_server')
+    .setLabel('Stop VPS & MC')
+    .setStyle(ButtonStyle.Danger);
+
+  const btnRestart = new ButtonBuilder()
+    .setCustomId('restart_server')
+    .setLabel('Restart MC')
+    .setStyle(ButtonStyle.Secondary);
+
+  const btnRefresh = new ButtonBuilder()
+    .setCustomId('refresh_status')
+    .setLabel('Refresh')
+    .setStyle(ButtonStyle.Primary);
+
+  const btnDevMode = new ButtonBuilder()
+    .setCustomId('set_dev_mode')
+    .setLabel('Dev Mode')
+    .setStyle(ButtonStyle.Primary);
+
+  const btnNormalMode = new ButtonBuilder()
+    .setCustomId('set_normal_mode')
+    .setLabel('Normal Mode')
+    .setStyle(ButtonStyle.Success);
+
+  // 1. stopped: chỉ hiện nút start và refresh
+  if (state === 'stopped') {
+    const row = new ActionRowBuilder().addComponents(btnStart, btnRefresh);
+    return [row];
+  }
+
+  // 2. pending & stopping: chỉ hiện nút refresh
+  if (state === 'pending' || state === 'stopping') {
+    const row = new ActionRowBuilder().addComponents(btnRefresh);
+    return [row];
+  }
+
+  // 3. running: hiện tất cả các nút (đối với mode: nếu o dev mode thi an dev mode, hien normal mode và ngược lại)
+  if (state === 'running') {
+    const row1 = new ActionRowBuilder().addComponents(btnStart, btnStop, btnRestart, btnRefresh);
+    const row2 = new ActionRowBuilder().addComponents(
+      mode === 'dev' ? btnNormalMode : btnDevMode
+    );
+    return [row1, row2];
+  }
+
+  // Mặc định
+  const defaultRow = new ActionRowBuilder().addComponents(btnStart, btnRefresh);
+  return [defaultRow];
 }
 
 /**
@@ -130,13 +158,14 @@ async function buildStatusEmbed() {
     .addFields(
       { name: 'VPS Status', value: `\`${ec2State.toUpperCase()}\``, inline: true },
       { name: 'Minecraft Server', value: mcOnline ? '`ONLINE`' : '`OFFLINE`', inline: true },
+      { name: 'Current Mode', value: currentMode === 'dev' ? '`DEV MODE (24/7)`' : '`NORMAL MODE (Auto-30m)`', inline: true },
       { name: 'Public IP', value: `\`${publicIp || 'Offline'}\``, inline: true },
       { name: 'Server Address', value: `\`${serverAddress}\``, inline: false }
     )
     .setTimestamp()
     .setFooter({ text: 'hsowndev - Động Chim Giấy' });
 
-  return embed;
+  return { embed, ec2State };
 }
 
 /**
@@ -241,16 +270,10 @@ function initDiscordBot() {
 
       const instanceId = process.env.EC2_INSTANCE_ID;
 
-      if (commandName === 'status') {
+      if (commandName === 'status' || commandName === 'panel') {
         await interaction.deferReply();
-        const embed = await buildStatusEmbed();
-        return interaction.editReply({ embeds: [embed], components: getDashboardActionRows() });
-      }
-
-      if (commandName === 'panel') {
-        await interaction.deferReply();
-        const embed = await buildStatusEmbed();
-        return interaction.editReply({ embeds: [embed], components: getDashboardActionRows() });
+        const { embed, ec2State } = await buildStatusEmbed();
+        return interaction.editReply({ embeds: [embed], components: getDashboardActionRows(ec2State) });
       }
 
       if (commandName === 'start') {
@@ -316,6 +339,7 @@ function initDiscordBot() {
         if (modeType === 'dev') {
           try {
             await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py dev || sudo touch /opt/mc-autoshutdown/DEV_MODE');
+            currentMode = 'dev';
             return interaction.editReply({ content: '[DEV MODE] Đã chuyển sang DEV MODE' });
           } catch (err) {
             return interaction.editReply({ content: `[ERROR] Lỗi khi bật Dev Mode: ${err.message}` });
@@ -323,6 +347,7 @@ function initDiscordBot() {
         } else {
           try {
             await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py normal || sudo rm -f /opt/mc-autoshutdown/DEV_MODE');
+            currentMode = 'normal';
             return interaction.editReply({ content: '[NORMAL MODE] Đã chuyển sang NORMAL MODE' });
           } catch (err) {
             return interaction.editReply({ content: `[ERROR] Lỗi khi bật Normal Mode: ${err.message}` });
@@ -377,8 +402,8 @@ function initDiscordBot() {
       // 1. Refresh Status
       if (customId === 'refresh_status') {
         await interaction.deferUpdate();
-        const embed = await buildStatusEmbed();
-        return interaction.editReply({ embeds: [embed], components: getDashboardActionRows() });
+        const { embed, ec2State } = await buildStatusEmbed();
+        return interaction.editReply({ embeds: [embed], components: getDashboardActionRows(ec2State) });
       }
 
       // 2. Start VPS & MC
@@ -420,6 +445,7 @@ function initDiscordBot() {
         await interaction.deferReply({ ephemeral: true });
         try {
           await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py dev || sudo touch /opt/mc-autoshutdown/DEV_MODE');
+          currentMode = 'dev';
           return interaction.editReply({ content: '[DEV MODE] Đã kích hoạt DEV MODE thành công' });
         } catch (err) {
           return interaction.editReply({ content: `[ERROR] Lỗi khi bật Dev Mode: ${err.message}` });
@@ -431,6 +457,7 @@ function initDiscordBot() {
         await interaction.deferReply({ ephemeral: true });
         try {
           await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py normal || sudo rm -f /opt/mc-autoshutdown/DEV_MODE');
+          currentMode = 'normal';
           return interaction.editReply({ content: '[NORMAL MODE] Đã kích hoạt NORMAL MODE thành công' });
         } catch (err) {
           return interaction.editReply({ content: `[ERROR] Lỗi khi bật Normal Mode: ${err.message}` });
@@ -501,8 +528,8 @@ function initDiscordBot() {
 
     // Status / Panel / Admin
     if (['!status', '!panel', '!admin'].includes(lowerContent)) {
-      const embed = await buildStatusEmbed();
-      return message.reply({ embeds: [embed], components: getDashboardActionRows() });
+      const { embed, ec2State } = await buildStatusEmbed();
+      return message.reply({ embeds: [embed], components: getDashboardActionRows(ec2State) });
     }
 
     // Help
@@ -558,6 +585,7 @@ function initDiscordBot() {
     if (['!mode dev', '!dev on', '!mode devmode'].includes(lowerContent)) {
       try {
         await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py dev || sudo touch /opt/mc-autoshutdown/DEV_MODE');
+        currentMode = 'dev';
         return message.reply('[DEV MODE] Đã chuyển sang DEV MODE');
       } catch (err) {
         return message.reply(`[ERROR] Lỗi khi bật Dev Mode: ${err.message}`);
@@ -568,6 +596,7 @@ function initDiscordBot() {
     if (['!mode normal', '!dev off', '!mode normalmode'].includes(lowerContent)) {
       try {
         await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py normal || sudo rm -f /opt/mc-autoshutdown/DEV_MODE');
+        currentMode = 'normal';
         return message.reply('[NORMAL MODE] Đã chuyển sang NORMAL MODE');
       } catch (err) {
         return message.reply(`[ERROR] Lỗi khi bật Normal Mode: ${err.message}`);
