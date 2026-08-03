@@ -66,7 +66,7 @@ function getDashboardActionRows() {
     new ButtonBuilder()
       .setCustomId('restart_server')
       .setLabel('Restart MC')
-      .setStyle(ButtonStyle.Warning),
+      .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId('refresh_status')
       .setLabel('Refresh Status')
