@@ -57,11 +57,11 @@ function getDashboardActionRows() {
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('start_server')
-      .setLabel('Start EC2 & MC')
+      .setLabel('Start VPS & MC')
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('stop_server')
-      .setLabel('Stop EC2 & MC')
+      .setLabel('Stop VPS & MC')
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId('restart_server')
@@ -125,7 +125,7 @@ async function buildStatusEmbed() {
 
   const embed = new EmbedBuilder()
     .setColor(embedColor)
-    .setTitle('Dashboard Quan Ly Server Minecraft & AWS EC2')
+    .setTitle('Dashboard Quan Ly Server Minecraft & VPS')
     .setDescription('Làm bởi hsowndev - phục vụ riêng cho server Discord Động Chim Giấy')
     .addFields(
       { name: 'VPS Status', value: `\`${ec2State.toUpperCase()}\``, inline: true },
@@ -347,10 +347,10 @@ function initDiscordBot() {
           .setTitle('Tro giup')
           .setDescription('Danh sách các lệnh:')
           .addFields(
-            { name: '`/status` hoặc `!status`', value: 'Xem trạng thái VPS EC2 và Minecraft Server realtime.', inline: false },
+            { name: '`/status` hoặc `!status`', value: 'Xem trạng thái VPS VPS và Minecraft Server realtime.', inline: false },
             { name: '`/panel` hoặc `!panel`', value: 'Mở Bảng điều khiển Dashboard trực quan dạng nút bấm.', inline: false },
-            { name: '`/start` hoặc `!start`', value: 'Khởi động VPS EC2 và Minecraft Server.', inline: false },
-            { name: '`/stop` hoặc `!stop`', value: 'Tắt Minecraft Server an toàn và ngắt VPS EC2.', inline: false },
+            { name: '`/start` hoặc `!start`', value: 'Khởi động VPS VPS và Minecraft Server.', inline: false },
+            { name: '`/stop` hoặc `!stop`', value: 'Tắt Minecraft Server an toàn và ngắt VPS VPS.', inline: false },
             { name: '`/restart` hoặc `!restart`', value: 'Khởi động lại Minecraft Server.', inline: false },
             { name: '`/mode dev` hoặc `!dev on`', value: 'Bật Dev Mode (Server chạy 24/7).', inline: false },
             { name: '`/mode normal` hoặc `!dev off`', value: 'Bật Normal Mode (Tự động tắt sau 30p 0 người chơi).', inline: false },
@@ -381,7 +381,7 @@ function initDiscordBot() {
         return interaction.editReply({ embeds: [embed], components: getDashboardActionRows() });
       }
 
-      // 2. Start EC2 & MC
+      // 2. Start VPS & MC
       if (customId === 'start_server') {
         await interaction.deferReply({ ephemeral: true });
         try {
@@ -392,7 +392,7 @@ function initDiscordBot() {
         }
       }
 
-      // 3. Stop EC2 & MC
+      // 3. Stop VPS & MC
       if (customId === 'stop_server') {
         await interaction.deferReply({ ephemeral: true });
         try {
