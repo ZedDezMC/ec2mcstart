@@ -276,6 +276,48 @@ async function buildStatusEmbed() {
 }
 
 /**
+ * Tạo Embed Trạng Thái Đơn Giản Dành Cho Người Dùng (/status)
+ * Chỉ hiển thị trạng thái Minecraft Server và Server Address, ẩn thông tin VPS
+ */
+async function buildUserStatusEmbed() {
+  const instanceId = process.env.EC2_INSTANCE_ID;
+  const mcPort = parseInt(process.env.MC_PORT || '25565', 10);
+  const customAddress = (process.env.CUSTOM_SERVER_ADDRESS || '').trim();
+
+  let publicIp = null;
+  let mcOnline = false;
+
+  if (instanceId && !instanceId.includes('i-0123456789')) {
+    try {
+      const status = await getInstanceStatus(instanceId);
+      publicIp = status.publicIp;
+
+      if (status.state === 'running' && publicIp) {
+        mcOnline = await checkMinecraftServerStatus(publicIp, mcPort);
+      }
+    } catch (err) {
+      console.error('error fetch user status:', err.message);
+    }
+  }
+
+  let serverAddress = customAddress || (publicIp ? `${publicIp}:${mcPort}` : 'N/A');
+  let embedColor = mcOnline ? 0x2ecc71 : 0xe74c3c;
+
+  const embed = new EmbedBuilder()
+    .setColor(embedColor)
+    .setTitle('Trang Thai Server Minecraft')
+    .setDescription('Hiển thị trạng thái và IP Server')
+    .addFields(
+      { name: 'Minecraft Server', value: mcOnline ? '`ONLINE` 🟢' : '`OFFLINE` 🔴', inline: true },
+      { name: 'IP Server', value: `\`${serverAddress}\``, inline: false }
+    )
+    .setTimestamp()
+    .setFooter({ text: 'hsowndev - Động Chim Giấy' });
+
+  return { embed };
+}
+
+/**
  * Đăng ký Slash Commands với Discord API
  */
 async function registerSlashCommands(clientId, token) {
@@ -395,7 +437,7 @@ function initDiscordBot() {
 
       if (commandName === 'status') {
         await interaction.deferReply();
-        const { embed } = await buildStatusEmbed();
+        const { embed } = await buildUserStatusEmbed();
         return editReplyWithAutoDelete(interaction, { embeds: [embed] }, 60000);
       }
 
@@ -763,9 +805,9 @@ function initDiscordBot() {
       return;
     }
 
-    // Status (Công khai cho mọi người)
+    // Status (Công khai cho mọi người - Embed đơn giản)
     if (lowerContent === '!status') {
-      const { embed } = await buildStatusEmbed();
+      const { embed } = await buildUserStatusEmbed();
       return sendAutoDeleteReply(message, { embeds: [embed] }, 60000);
     }
 
