@@ -11,7 +11,7 @@ const {
   SlashCommandBuilder
 } = require('discord.js');
 
-const { getInstanceStatus, startInstance, stopInstance, runSSMStartMinecraftCommand } = require('./aws');
+const { getInstanceStatus, startInstance, stopInstance, rebootInstance, runSSMStartMinecraftCommand } = require('./aws');
 const { checkMinecraftServerStatus, sendMinecraftRconCommand } = require('./minecraft');
 const { generatePufferPanelSSMCommand } = require('./pufferpanel');
 
@@ -25,20 +25,21 @@ let currentMode = 'normal'; // Mode hiện tại: 'normal' hoặc 'dev'
 function isAuthorized(member, user) {
   const adminId = (process.env.DISCORD_ADMIN_ID || '').trim();
   const allowedRoleId = (process.env.DISCORD_ADMIN_ROLE_ID || '1225455630014480404').trim();
+  const extraBypassRoleId = '1531664569590616205';
 
   // 1. Kiểm tra User ID trực tiếp của Admin
   if (adminId && !adminId.includes('XXXXXX') && user && user.id === adminId) {
     return true;
   }
 
-  // 2. Kiểm tra nếu người dùng sở hữu Role ID (1225455630014480404)
+  // 2. Kiểm tra nếu người dùng sở hữu Role ID admin hoặc role 1531664569590616205
   if (member && member.roles) {
     if (member.roles.cache && typeof member.roles.cache.has === 'function') {
-      if (member.roles.cache.has(allowedRoleId)) {
+      if (member.roles.cache.has(allowedRoleId) || member.roles.cache.has(extraBypassRoleId)) {
         return true;
       }
     }
-    if (Array.isArray(member.roles) && member.roles.includes(allowedRoleId)) {
+    if (Array.isArray(member.roles) && (member.roles.includes(allowedRoleId) || member.roles.includes(extraBypassRoleId))) {
       return true;
     }
   }
@@ -49,6 +50,20 @@ function isAuthorized(member, user) {
   }
 
   return false;
+}
+
+const ALLOWED_CHANNELS = ['1273063048520667217', '1531664569590616205'];
+
+/**
+ * Kiểm tra xem kênh hiện tại người dùng có được phép thực thi lệnh hay không
+ */
+function isChannelAllowed(channelId, member, user) {
+  // Người tạo bot / Admin / Role 1531664569590616205 được phép sử dụng ở MỌI kênh
+  if (isAuthorized(member, user)) {
+    return true;
+  }
+  // User thường chỉ được dùng ở 2 kênh 1273063048520667217 và 1531664569590616205
+  return ALLOWED_CHANNELS.includes(channelId);
 }
 
 /**
@@ -150,6 +165,11 @@ function getDashboardActionRows(ec2State, mode = currentMode) {
     .setLabel('Start VPS & MC')
     .setStyle(ButtonStyle.Success);
 
+  const btnRebootVPS = new ButtonBuilder()
+    .setCustomId('reboot_vps')
+    .setLabel('Restart VPS')
+    .setStyle(ButtonStyle.Danger);
+
   const btnStop = new ButtonBuilder()
     .setCustomId('stop_server')
     .setLabel('Stop VPS & MC')
@@ -187,10 +207,11 @@ function getDashboardActionRows(ec2State, mode = currentMode) {
     return [row];
   }
 
-  // 3. running: hiện tất cả các nút (đối với mode: nếu o dev mode thi an dev mode, hien normal mode và ngược lại)
+  // 3. running: hiện tất cả các nút
   if (state === 'running') {
-    const row1 = new ActionRowBuilder().addComponents(btnStart, btnStop, btnRestart, btnRefresh);
+    const row1 = new ActionRowBuilder().addComponents(btnStart, btnStop, btnRestart, btnRebootVPS);
     const row2 = new ActionRowBuilder().addComponents(
+      btnRefresh,
       mode === 'dev' ? btnNormalMode : btnDevMode
     );
     return [row1, row2];
@@ -261,7 +282,10 @@ async function registerSlashCommands(clientId, token) {
   const commands = [
     new SlashCommandBuilder()
       .setName('status')
-      .setDescription('Kiểm tra trạng thái VPS và Minecraft Server'),
+      .setDescription('Kiểm tra trạng thái Server Minecraft'),
+    new SlashCommandBuilder()
+      .setName('startmc')
+      .setDescription('Khởi động Server Minecraft (khi VPS đang chạy)'),
     new SlashCommandBuilder()
       .setName('panel')
       .setDescription('Hiện dashboard điều khiển'),
@@ -275,6 +299,9 @@ async function registerSlashCommands(clientId, token) {
       .setName('restart')
       .setDescription('Khởi động lại Minecraft Server'),
     new SlashCommandBuilder()
+      .setName('rebootvps')
+      .setDescription('Khởi động lại VPS'),
+    new SlashCommandBuilder()
       .setName('mode')
       .setDescription('Đổi mode (Dev Mode / Normal Mode)')
       .addStringOption(option =>
@@ -282,7 +309,7 @@ async function registerSlashCommands(clientId, token) {
           .setDescription('Loại chế độ')
           .setRequired(true)
           .addChoices(
-            { name: 'Dev Mode (24/7)', value: 'dev' },
+            { name: 'Dev Mode (Dùng khi cần restart server nhiều lần, cài & test plugin)', value: 'dev' },
             { name: 'Normal Mode (Tự tắt sau 30p)', value: 'normal' }
           )
       ),
@@ -291,7 +318,7 @@ async function registerSlashCommands(clientId, token) {
       .setDescription('Gửi lệnh trực tiếp vào Console Server Minecraft')
       .addStringOption(option =>
         option.setName('command')
-          .setDescription('Lệnh Minecraft cần thực thi (VD: list, say Hello, op player)')
+          .setDescription('Lệnh Minecraft cần dùng')
           .setRequired(true)
       ),
     new SlashCommandBuilder()
@@ -347,18 +374,78 @@ function initDiscordBot() {
     if (interaction.isChatInputCommand()) {
       const { commandName } = interaction;
 
-      if (!isAuthorized(interaction.member, interaction.user)) {
+      // 1. Kiểm tra kênh được phép cho User thường
+      if (!isChannelAllowed(interaction.channelId, interaction.member, interaction.user)) {
         return interaction.reply({
-          content: '[DENIED] Hiện tại không có quyền để thực thi lệnh này.',
+          content: '[DENIED] Bạn chỉ được phép sử dụng lệnh này tại kênh <#1273063048520667217> hoặc <#1531664569590616205>.',
+          ephemeral: true
+        });
+      }
+
+      // 2. Công khai cho mọi người: /status, /startmc, /help. Các lệnh khác yêu cầu Admin.
+      const publicCommands = ['status', 'startmc', 'help'];
+      if (!publicCommands.includes(commandName) && !isAuthorized(interaction.member, interaction.user)) {
+        return interaction.reply({
+          content: '[DENIED] Hiện tại không có quyền để sử dụng lệnh này.',
           ephemeral: true
         });
       }
 
       const instanceId = process.env.EC2_INSTANCE_ID;
 
-      if (commandName === 'status' || commandName === 'panel') {
+      if (commandName === 'status') {
+        await interaction.deferReply();
+        const { embed } = await buildStatusEmbed();
+        return editReplyWithAutoDelete(interaction, { embeds: [embed] }, 60000);
+      }
+
+      if (commandName === 'panel') {
         await interaction.deferReply();
         return startAutoRefreshInteractionPanel(interaction, 5000, 300000);
+      }
+
+      if (commandName === 'startmc') {
+        await interaction.deferReply();
+        try {
+          const { state, publicIp } = await getInstanceStatus(instanceId);
+          if (state !== 'running') {
+            return editReplyWithAutoDelete(interaction, {
+              content: `[INFO] VPS hiện tại đang ở trạng thái \`${state.toUpperCase()}\`. Vui lòng liên hệ Admin hoặc bấm bật VPS trên Website!`
+            }, 60000);
+          }
+
+          const mcPort = parseInt(process.env.MC_PORT || '25565', 10);
+          const mcOnline = publicIp ? await checkMinecraftServerStatus(publicIp, mcPort) : false;
+          if (mcOnline) {
+            const customAddress = (process.env.CUSTOM_SERVER_ADDRESS || '').trim();
+            const serverAddr = customAddress || (publicIp ? `${publicIp}:${mcPort}` : 'N/A');
+            return editReplyWithAutoDelete(interaction, {
+              content: `[INFO] Server Minecraft hiện tại đã ONLINE rồi!\nĐịa chỉ máy chủ: \`${serverAddr}\``
+            }, 60000);
+          }
+
+          const pufferServerId = process.env.PUFFER_SERVER_ID;
+          if (pufferServerId && process.env.PUFFER_CLIENT_ID) {
+            const ssmPufferCmd = generatePufferPanelSSMCommand(
+              pufferServerId,
+              process.env.PUFFER_CLIENT_ID,
+              process.env.PUFFER_CLIENT_SECRET,
+              process.env.PUFFER_PORT || '8080'
+            );
+            await runSSMStartMinecraftCommand(instanceId, ssmPufferCmd);
+          } else {
+            const mcCommand = process.env.MC_START_COMMAND || 'sudo systemctl start minecraft';
+            await runSSMStartMinecraftCommand(instanceId, mcCommand);
+          }
+
+          return editReplyWithAutoDelete(interaction, {
+            content: '[START MC] Đã gửi lệnh bật Server Minecraft! Vui lòng chờ khoảng 30-60 giây để server khởi động hoàn tất.'
+          }, 60000);
+        } catch (err) {
+          return editReplyWithAutoDelete(interaction, {
+            content: `[ERROR] Không thể khởi động Server Minecraft: ${err.message}`
+          }, 60000);
+        }
       }
 
       if (commandName === 'start') {
@@ -415,6 +502,16 @@ function initDiscordBot() {
           return editReplyWithAutoDelete(interaction, { content: '[SUCCESS] Đã gửi lệnh Restart Minecraft Server!' }, 60000);
         } catch (err) {
           return editReplyWithAutoDelete(interaction, { content: `[ERROR] Không thể restart Minecraft Server: ${err.message}` }, 60000);
+        }
+      }
+
+      if (commandName === 'rebootvps') {
+        await interaction.deferReply();
+        try {
+          await rebootInstance(instanceId);
+          return editReplyWithAutoDelete(interaction, { content: '[REBOOT] Đã gửi lệnh Restart VPS thành công! Vui lòng chờ 1-2 phút để VPS khởi động lại.' }, 60000);
+        } catch (err) {
+          return editReplyWithAutoDelete(interaction, { content: `[ERROR] Không thể Restart VPS: ${err.message}` }, 60000);
         }
       }
 
@@ -483,16 +580,20 @@ function initDiscordBot() {
         const helpEmbed = new EmbedBuilder()
           .setColor(0x3498db)
           .setTitle('Tro giup')
-          .setDescription('Danh sách các lệnh:')
+          .setDescription('Các câu lệnh Discord Bot:')
           .addFields(
-            { name: '`/status` hoặc `!status`', value: 'Xem trạng thái VPS và Minecraft Server realtime.', inline: false },
-            { name: '`/panel` hoặc `!panel`', value: 'Mở Bảng điều khiển Dashboard trực quan dạng nút bấm.', inline: false },
-            { name: '`/start` hoặc `!start`', value: 'Khởi động VPS và Minecraft Server.', inline: false },
-            { name: '`/stop` hoặc `!stop`', value: 'Tắt Minecraft Server an toàn và ngắt VPS.', inline: false },
+            { name: '🌐 CÔNG KHAI (Mọi người dùng được):', value: '───────────────────────────', inline: false },
+            { name: '`/status` hoặc `!status`', value: 'Xem trạng thái VPS, Server Minecraft và Địa chỉ máy chủ.', inline: false },
+            { name: '`/startmc` hoặc `!startmc`', value: 'Khởi động Server Minecraft (khi VPS đã chạy).', inline: false },
+            { name: '`/help` hoặc `!help`', value: 'Xem menu trợ giúp.', inline: false },
+            { name: '🛠️ QUẢN TRỊ (Dành riêng cho Admin):', value: '───────────────────────────', inline: false },
+            { name: '`/panel` hoặc `!panel`', value: 'Mở Bảng điều khiển Dashboard trực quan.', inline: false },
+            { name: '`/start` hoặc `!start`', value: 'Bật cả VPS và Minecraft Server.', inline: false },
+            { name: '`/stop` hoặc `!stop`', value: 'Tắt Minecraft Server và VPS.', inline: false },
             { name: '`/restart` hoặc `!restart`', value: 'Khởi động lại Minecraft Server.', inline: false },
-            { name: '`/mode dev` hoặc `!dev on`', value: 'Bật Dev Mode (Server chạy 24/7).', inline: false },
-            { name: '`/mode normal` hoặc `!dev off`', value: 'Bật Normal Mode (Tự động tắt sau 30p 0 người chơi).', inline: false },
-            { name: '`/cmd <lệnh>` hoặc `!cmd <lệnh>`', value: 'Gửi lệnh trực tiếp vào Console Server Minecraft và nhận kết quả.', inline: false }
+            { name: '`/rebootvps` hoặc `!rebootvps`', value: 'Khởi động lại máy chủ VPS EC2.', inline: false },
+            { name: '`/mode` hoặc `!mode`', value: 'Đổi chế độ Dev Mode / Normal Mode.', inline: false },
+            { name: '`/cmd <lệnh>` hoặc `!cmd <lệnh>`', value: 'Gửi lệnh trực tiếp vào Console Server Minecraft.', inline: false }
           );
         return interaction.reply({ embeds: [helpEmbed] });
       }
@@ -550,6 +651,17 @@ function initDiscordBot() {
           return editReplyWithAutoDelete(interaction, { content: '[RESTART] Đã gửi lệnh Restart Minecraft Server!' }, 60000);
         } catch (err) {
           return editReplyWithAutoDelete(interaction, { content: `[ERROR] Lỗi khi Restart: ${err.message}` }, 60000);
+        }
+      }
+
+      // 4.5. Restart VPS
+      if (customId === 'reboot_vps') {
+        await interaction.deferReply({ ephemeral: true });
+        try {
+          await rebootInstance(instanceId);
+          return editReplyWithAutoDelete(interaction, { content: '[REBOOT] Đã gửi lệnh Restart VPS thành công! Vui lòng chờ 1-2 phút để VPS khởi động lại.' }, 60000);
+        } catch (err) {
+          return editReplyWithAutoDelete(interaction, { content: `[ERROR] Lỗi khi Restart VPS: ${err.message}` }, 60000);
         }
       }
 
@@ -630,18 +742,72 @@ function initDiscordBot() {
     }
   });
 
-  // 2. Lắng nghe tin nhắn văn bản Prefix (`!`) từ Admin
+  // 2. Lắng nghe tin nhắn văn bản Prefix (`!`) từ Admin & User
   client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
-    if (!isAuthorized(message.member, message.author)) return;
 
     const content = message.content.trim();
     const lowerContent = content.toLowerCase();
     const instanceId = process.env.EC2_INSTANCE_ID;
 
-    // Status / Panel / Admin
-    if (['!status', '!panel', '!admin'].includes(lowerContent)) {
+    // 1. Kiểm tra kênh được phép cho User thường
+    if (!isChannelAllowed(message.channel.id, message.member, message.author)) {
+      return;
+    }
+
+    // 2. Danh sách lệnh công khai cho tất cả mọi người (!status, !startmc, !help)
+    const publicPrefixes = ['!status', '!startmc', '!mcstart', '!start-mc', '!help', '!h'];
+    const isPublicCmd = publicPrefixes.includes(lowerContent);
+
+    if (!isPublicCmd && !isAuthorized(message.member, message.author)) {
+      return;
+    }
+
+    // Status (Công khai cho mọi người)
+    if (lowerContent === '!status') {
+      const { embed } = await buildStatusEmbed();
+      return sendAutoDeleteReply(message, { embeds: [embed] }, 60000);
+    }
+
+    // Panel / Admin (Dành riêng cho Admin)
+    if (['!panel', '!admin'].includes(lowerContent)) {
       return startAutoRefreshMessagePanel(message, 5000, 300000);
+    }
+
+    // Start MC (Công khai cho mọi người khi VPS đang chạy)
+    if (['!startmc', '!mcstart', '!start-mc'].includes(lowerContent)) {
+      try {
+        const { state, publicIp } = await getInstanceStatus(instanceId);
+        if (state !== 'running') {
+          return sendAutoDeleteReply(message, `[INFO] VPS hiện tại đang ở trạng thái \`${state.toUpperCase()}\`. Vui lòng liên hệ Admin hoặc bấm bật VPS trên Website!`, 60000);
+        }
+
+        const mcPort = parseInt(process.env.MC_PORT || '25565', 10);
+        const mcOnline = publicIp ? await checkMinecraftServerStatus(publicIp, mcPort) : false;
+        if (mcOnline) {
+          const customAddress = (process.env.CUSTOM_SERVER_ADDRESS || '').trim();
+          const serverAddr = customAddress || (publicIp ? `${publicIp}:${mcPort}` : 'N/A');
+          return sendAutoDeleteReply(message, `[INFO] Server Minecraft hiện tại đã ONLINE rồi!\nĐịa chỉ máy chủ: \`${serverAddr}\``, 60000);
+        }
+
+        const pufferServerId = process.env.PUFFER_SERVER_ID;
+        if (pufferServerId && process.env.PUFFER_CLIENT_ID) {
+          const ssmPufferCmd = generatePufferPanelSSMCommand(
+            pufferServerId,
+            process.env.PUFFER_CLIENT_ID,
+            process.env.PUFFER_CLIENT_SECRET,
+            process.env.PUFFER_PORT || '8080'
+          );
+          await runSSMStartMinecraftCommand(instanceId, ssmPufferCmd);
+        } else {
+          const mcCommand = process.env.MC_START_COMMAND || 'sudo systemctl start minecraft';
+          await runSSMStartMinecraftCommand(instanceId, mcCommand);
+        }
+
+        return sendAutoDeleteReply(message, '[START MC] Đã gửi lệnh bật Server Minecraft! Vui lòng chờ khoảng 30-60 giây để server khởi động hoàn tất.', 60000);
+      } catch (err) {
+        return sendAutoDeleteReply(message, `[ERROR] Không thể khởi động Server Minecraft: ${err.message}`, 60000);
+      }
     }
 
     // Help
@@ -649,15 +815,21 @@ function initDiscordBot() {
       const helpEmbed = new EmbedBuilder()
         .setColor(0x3498db)
         .setTitle('Tro giup')
-        .setDescription('Các câu lệnh dạng Prefix (`!`):')
+        .setDescription('Các câu lệnh Discord Bot:')
         .addFields(
-          { name: '`!status` / `!panel`', value: 'Mở Dashboard điều khiển trực quan.', inline: false },
-          { name: '`!start`', value: 'Bật VPS và Minecraft Server.', inline: false },
-          { name: '`!stop`', value: 'Tắt Minecraft Server và ngắt VPS.', inline: false },
+          { name: '🌐 CÔNG KHAI (Mọi người dùng được):', value: '───────────────────────────', inline: false },
+          { name: '`!status`', value: 'Xem trạng thái VPS, Server Minecraft và Địa chỉ máy chủ.', inline: false },
+          { name: '`!startmc`', value: 'Khởi động Server Minecraft (khi VPS đã chạy).', inline: false },
+          { name: '`!help`', value: 'Xem menu trợ giúp.', inline: false },
+          { name: '🛠️ QUẢN TRỊ (Dành riêng cho Admin):', value: '───────────────────────────', inline: false },
+          { name: '`!panel`', value: 'Mở Dashboard điều khiển trực quan.', inline: false },
+          { name: '`!start`', value: 'Bật cả VPS và Minecraft Server.', inline: false },
+          { name: '`!stop`', value: 'Tắt Minecraft Server và VPS.', inline: false },
           { name: '`!restart`', value: 'Khởi động lại Minecraft Server.', inline: false },
+          { name: '`!rebootvps`', value: 'Khởi động lại máy chủ VPS EC2.', inline: false },
           { name: '`!dev on` / `!mode dev`', value: 'Bật Dev Mode.', inline: false },
           { name: '`!dev off` / `!mode normal`', value: 'Bật Normal Mode.', inline: false },
-          { name: '`!cmd <lệnh>`', value: 'Gửi lệnh trực tiếp vào Console Server Minecraft và nhận kết quả.', inline: false }
+          { name: '`!cmd <lệnh>`', value: 'Gửi lệnh trực tiếp vào Console Server Minecraft.', inline: false }
         );
       return message.reply({ embeds: [helpEmbed] });
     }
@@ -682,7 +854,7 @@ function initDiscordBot() {
       }
     }
 
-    // Restart
+    // Restart MC
     if (lowerContent === '!restart') {
       try {
         const mcCmd = process.env.MC_START_COMMAND || 'sudo systemctl restart minecraft';
@@ -690,6 +862,16 @@ function initDiscordBot() {
         return sendAutoDeleteReply(message, '[RESTART] Đã gửi lệnh Restart Minecraft Server!', 60000);
       } catch (err) {
         return sendAutoDeleteReply(message, `[ERROR] Không thể Restart: ${err.message}`, 60000);
+      }
+    }
+
+    // Restart VPS
+    if (['!rebootvps', '!restartvps', '!vpsrestart'].includes(lowerContent)) {
+      try {
+        await rebootInstance(instanceId);
+        return sendAutoDeleteReply(message, '[REBOOT] Đã gửi lệnh Restart VPS thành công! Vui lòng chờ 1-2 phút để VPS khởi động lại.', 60000);
+      } catch (err) {
+        return sendAutoDeleteReply(message, `[ERROR] Không thể Restart VPS: ${err.message}`, 60000);
       }
     }
 

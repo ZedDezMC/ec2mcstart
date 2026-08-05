@@ -13,6 +13,8 @@ async function syncCloudflareDNS(publicIp) {
   }
 
   const apiToken = (process.env.CLOUDFLARE_API_TOKEN || '').trim();
+  const apiKey = (process.env.CLOUDFLARE_API_KEY || process.env.CLOUDFLARE_GLOBAL_KEY || '').trim();
+  const email = (process.env.CLOUDFLARE_EMAIL || '').trim();
   const zoneId = (process.env.CLOUDFLARE_ZONE_ID || '').trim();
   let recordName = (process.env.CLOUDFLARE_RECORD_NAME || process.env.CUSTOM_SERVER_ADDRESS || '').trim();
 
@@ -21,8 +23,8 @@ async function syncCloudflareDNS(publicIp) {
     recordName = recordName.split(':')[0];
   }
 
-  // Nếu chưa cấu hình token hoặc zone ID, đưa ra cảnh báo và bỏ qua
-  if (!apiToken || !zoneId || !recordName) {
+  // Nếu chưa cấu hình token/key hoặc zone ID, bỏ qua
+  if (!zoneId || !recordName || (!apiToken && (!apiKey || !email))) {
     return;
   }
 
@@ -31,9 +33,15 @@ async function syncCloudflareDNS(publicIp) {
 
   try {
     const headers = {
-      'Authorization': `Bearer ${apiToken}`,
       'Content-Type': 'application/json'
     };
+
+    if (apiToken) {
+      headers['Authorization'] = `Bearer ${apiToken}`;
+    } else if (apiKey && email) {
+      headers['X-Auth-Email'] = email;
+      headers['X-Auth-Key'] = apiKey;
+    }
 
     // 1. Tìm bản ghi A hiện tại trên Cloudflare
     const searchUrl = `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records?type=A&name=${recordName}`;
@@ -91,7 +99,16 @@ async function syncCloudflareDNS(publicIp) {
     }
 
   } catch (error) {
-    console.error('[Cloudflare DDNS Error]', error.response?.data || error.message);
+    const errData = error.response?.data;
+    if (errData && errData.errors && errData.errors.some(e => e.code === 10000)) {
+      console.error(`[Cloudflare DDNS Error] Lỗi xác thực (Code 10000: Authentication error).`);
+      console.error(`👉 Nguyên nhân: API Token hoặc Zone ID trong .env chưa đúng / chưa đủ quyền.`);
+      console.error(`👉 Cách khắc phục:`);
+      console.error(`   - Cách 1 (API Token): Tạo Token tại Cloudflare (My Profile -> API Tokens -> Create Token -> Edit zone DNS). Đảm bảo chọn Zone Resources là "All zones" hoặc chọn đúng tên miền hsown.xyz.`);
+      console.error(`   - Cách 2 (Global API Key): Nếu dùng Global API Key, mở .env và điền thêm CLOUDFLARE_EMAIL=email_cua_ban và CLOUDFLARE_API_KEY=key_cua_ban.`);
+    } else {
+      console.error('[Cloudflare DDNS Error]', errData || error.message);
+    }
   } finally {
     isSyncing = false;
   }

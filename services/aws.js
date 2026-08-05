@@ -1,4 +1,4 @@
-const { EC2Client, DescribeInstancesCommand, StartInstancesCommand, StopInstancesCommand } = require('@aws-sdk/client-ec2');
+const { EC2Client, DescribeInstancesCommand, StartInstancesCommand, StopInstancesCommand, RebootInstancesCommand } = require('@aws-sdk/client-ec2');
 const { SSMClient, SendCommandCommand, GetCommandInvocationCommand } = require('@aws-sdk/client-ssm');
 const { syncCloudflareDNS } = require('./cloudflare');
 
@@ -91,6 +91,22 @@ async function stopInstance(instanceId) {
 }
 
 /**
+ * Gửi yêu cầu Restart (Reboot) EC2 Instance
+ */
+async function rebootInstance(instanceId) {
+  try {
+    const command = new RebootInstancesCommand({ InstanceIds: [instanceId] });
+    await ec2Client.send(command);
+    return {
+      success: true
+    };
+  } catch (error) {
+    console.error('Loi khi reboot EC2 Instance:', error);
+    throw error;
+  }
+}
+
+/**
  * Chạy lệnh khởi động Minecraft Server trên VPS qua AWS SSM RunCommand
  */
 async function runSSMStartMinecraftCommand(instanceId, shellCommand) {
@@ -178,6 +194,7 @@ module.exports = {
   getInstanceStatus,
   startInstance,
   stopInstance,
+  rebootInstance,
   runSSMStartMinecraftCommand,
   runSSMCommandWithOutput
 };
