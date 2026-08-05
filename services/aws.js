@@ -1,5 +1,6 @@
 const { EC2Client, DescribeInstancesCommand, StartInstancesCommand, StopInstancesCommand } = require('@aws-sdk/client-ec2');
 const { SSMClient, SendCommandCommand, GetCommandInvocationCommand } = require('@aws-sdk/client-ssm');
+const { syncCloudflareDNS } = require('./cloudflare');
 
 // Khởi tạo SDK Clients với credentials từ .env
 const getCredentials = () => {
@@ -33,6 +34,11 @@ async function getInstanceStatus(instanceId) {
     const instance = response.Reservations[0].Instances[0];
     const state = instance.State ? instance.State.Name : 'unknown';
     const publicIp = instance.PublicIpAddress || instance.PublicDnsName || null;
+
+    // Tự động đồng bộ IP mới lên Cloudflare DDNS nếu VPS đang running
+    if (state === 'running' && publicIp) {
+      syncCloudflareDNS(publicIp).catch(err => console.error('[Cloudflare Sync Error]', err.message));
+    }
 
     return {
       state, // 'pending' | 'running' | 'shutting-down' | 'terminated' | 'stopping' | 'stopped'
