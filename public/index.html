@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Minecraft Server On-Demand | VPS Starter</title>
+  <title>hsowndev - Server Starter</title>
   <meta name="description"
     content="Trang web bật server Minecraft, phục vụ riêng cho server Minecraft và server Discord Động Chim Giấy">
 
@@ -52,7 +52,7 @@
     <!-- Status Dashboard Card -->
     <div class="card glass-card">
       <div class="card-header">
-        <h2>Trạng Thái Hệ Thống</h2>
+        <h2>Trạng Thái</h2>
         <button id="btn-refresh" class="btn-icon" title="Cập nhật trạng thái">
           <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
             <path d="M23 4v6h-6M1 20v-6h6"></path>
@@ -96,15 +96,14 @@
     <div class="card glass-card action-card">
       <!-- State 1: EC2 Offline -> Start EC2 Form -->
       <div id="section-start-ec2" class="action-section">
-        <h3>1. Khởi Động Server</h3>
-        <p class="desc">VPS và server Minecraft hiện đang tắt, hoàn thành Captcha bên dưới và bấm nút để tiến hành bật
-          server.</p>
+        <h3>1. Khởi Động</h3>
+        <p class="desc">Server Minecraft hiện đang tắt, hoàn thành Captcha bên dưới và bấm nút để tiến hành bật</p>
 
         <!-- Turnstile Captcha Widget Container -->
         <div id="captcha-container" class="captcha-wrapper"></div>
 
         <button id="btn-start-ec2" class="btn btn-primary" disabled>
-          <span class="btn-text">Khởi Động VPS</span>
+          <span class="btn-text">Khởi Động</span>
         </button>
       </div>
 
@@ -112,7 +111,7 @@
       <div id="section-starting" class="action-section hidden text-center">
         <div class="spinner"></div>
         <h3 id="starting-title">Đang Khởi Động...</h3>
-        <p class="desc">Vui lòng chờ khoảng 30 - 60 giây để server được khởi động.</p>
+        <p class="desc">Chờ khoảng 30 - 60 giây để server khởi động</p>
         <div class="progress-bar-container">
           <div id="progress-bar" class="progress-bar"></div>
         </div>
@@ -146,7 +145,7 @@
             <span>Đã gửi yêu cầu bật server đến Admin</span>
           </div>
 
-          <p class="desc">Vui lòng chờ Admin <strong>[Chấp nhận]</strong> yêu cầu.
+          <p class="desc">Admin sẽ <strong>[Chấp nhận]</strong> yêu cầu
           </p>
 
           <div class="countdown-box">
@@ -159,7 +158,7 @@
       <!-- State 5: EC2 & Minecraft Both Online -->
       <div id="section-online" class="action-section hidden text-center">
         <div class="success-badge">🎉</div>
-        <h3 class="success-title">Server Minecraft Đang Online!</h3>
+        <h3 class="success-title">Chúc mừng!</h3>
         <p class="desc">Server đang hoạt động, đi đến chơi ngay!</p>
       </div>
     </div>
@@ -201,7 +200,7 @@
   </div>
 
   <footer class="footer">
-    <p>© 2026 On-Demand Minecraft EC2 Management | Cấu hình tự động tiết kiệm chi phí</p>
+    <p>© 2026 hsowndev | Server Discord Động Chim Giấy</p>
   </footer>
 
   <script src="app.js"></script>

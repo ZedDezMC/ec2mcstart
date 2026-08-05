@@ -79,7 +79,7 @@ async function stopInstance(instanceId) {
       currentState: stoppingInstance ? stoppingInstance.CurrentState.Name : 'stopping'
     };
   } catch (error) {
-    console.error('Loi khi stop EC2 Instance:', error);
+    console.error('Loi khi stop:', error);
     throw error;
   }
 }
@@ -163,7 +163,7 @@ async function runSSMCommandWithOutput(instanceId, shellCommand, timeoutMs = 150
       stderr: 'Lệnh chạy quá thời gian (Timeout)'
     };
   } catch (error) {
-    console.error('Lỗi khi chạy SSM Command With Output:', error);
+    console.error('Lỗi khi chạy:', error);
     throw error;
   }
 }
