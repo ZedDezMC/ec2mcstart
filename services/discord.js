@@ -52,6 +52,37 @@ function isAuthorized(member, user) {
 }
 
 /**
+ * Tự động xóa phản hồi tin nhắn văn bản sau 1 phút (60,000ms)
+ */
+async function sendAutoDeleteReply(message, options, delayMs = 60000) {
+  try {
+    const sentMsg = await message.reply(options);
+    setTimeout(() => {
+      sentMsg.delete().catch(() => {});
+      message.delete().catch(() => {});
+    }, delayMs);
+    return sentMsg;
+  } catch (err) {
+    console.error('[Discord Bot Error] Không thể gửi/xóa tin nhắn:', err.message);
+  }
+}
+
+/**
+ * Tự động xóa phản hồi Interaction (Slash Command / Button) sau 1 phút (60,000ms)
+ */
+async function editReplyWithAutoDelete(interaction, options, delayMs = 60000) {
+  try {
+    const res = await interaction.editReply(options);
+    setTimeout(() => {
+      interaction.deleteReply().catch(() => {});
+    }, delayMs);
+    return res;
+  } catch (err) {
+    console.error('[Discord Bot Error] Không thể chỉnh sửa/xóa interaction reply:', err.message);
+  }
+}
+
+/**
  * Tạo Hàng Nút Bấm Điều Khiển Theo Trạng Thái & Chế Độ (Interactive Dashboard Action Rows)
  * @param {string} ec2State Trạng thái VPS ('stopped' | 'pending' | 'running' | 'stopping')
  * @param {string} mode Chế độ hiện tại ('normal' | 'dev')
@@ -285,9 +316,9 @@ function initDiscordBot() {
             .setTitle('[START] Dang khoi dong VPS...')
             .setDescription(`Đã gửi lệnh bật VPS (${instanceId}).\nTrạng thái trước đó: \`${res.previousState}\` -> Trạng thái hiện tại: \`${res.currentState}\`.\nVui lòng chờ khoảng 30-60 giây để hoàn thành thao tác.`)
             .setTimestamp();
-          return interaction.editReply({ embeds: [embed] });
+          return editReplyWithAutoDelete(interaction, { embeds: [embed] }, 60000);
         } catch (err) {
-          return interaction.editReply({ content: `[ERROR] Không thể khởi động VPS: ${err.message}` });
+          return editReplyWithAutoDelete(interaction, { content: `[ERROR] Không thể khởi động VPS: ${err.message}` }, 60000);
         }
       }
 
@@ -305,9 +336,9 @@ function initDiscordBot() {
             .setTitle('[STOP] Dang tat VPS...')
             .setDescription(`Đã gửi lệnh tắt VPS (${instanceId}).\nTrạng thái trước đó: \`${res.previousState}\` -> Trạng thái hiện tại: \`${res.currentState}\`.`)
             .setTimestamp();
-          return interaction.editReply({ embeds: [embed] });
+          return editReplyWithAutoDelete(interaction, { embeds: [embed] }, 60000);
         } catch (err) {
-          return interaction.editReply({ content: `[ERROR] Không thể tắt VPS: ${err.message}` });
+          return editReplyWithAutoDelete(interaction, { content: `[ERROR] Không thể tắt VPS: ${err.message}` }, 60000);
         }
       }
 
@@ -327,9 +358,9 @@ function initDiscordBot() {
             const mcCmd = process.env.MC_START_COMMAND || 'sudo systemctl restart minecraft';
             await runSSMStartMinecraftCommand(instanceId, mcCmd);
           }
-          return interaction.editReply({ content: '[SUCCESS] Đã gửi lệnh Restart Minecraft Server!' });
+          return editReplyWithAutoDelete(interaction, { content: '[SUCCESS] Đã gửi lệnh Restart Minecraft Server!' }, 60000);
         } catch (err) {
-          return interaction.editReply({ content: `[ERROR] Không thể restart Minecraft Server: ${err.message}` });
+          return editReplyWithAutoDelete(interaction, { content: `[ERROR] Không thể restart Minecraft Server: ${err.message}` }, 60000);
         }
       }
 
@@ -340,17 +371,17 @@ function initDiscordBot() {
           try {
             await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py dev || sudo touch /opt/mc-autoshutdown/DEV_MODE');
             currentMode = 'dev';
-            return interaction.editReply({ content: '[DEV MODE] Đã chuyển sang DEV MODE' });
+            return editReplyWithAutoDelete(interaction, { content: '[DEV MODE] Đã chuyển sang DEV MODE' }, 60000);
           } catch (err) {
-            return interaction.editReply({ content: `[ERROR] Lỗi khi bật Dev Mode: ${err.message}` });
+            return editReplyWithAutoDelete(interaction, { content: `[ERROR] Lỗi khi bật Dev Mode: ${err.message}` }, 60000);
           }
         } else {
           try {
             await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py normal || sudo rm -f /opt/mc-autoshutdown/DEV_MODE');
             currentMode = 'normal';
-            return interaction.editReply({ content: '[NORMAL MODE] Đã chuyển sang NORMAL MODE' });
+            return editReplyWithAutoDelete(interaction, { content: '[NORMAL MODE] Đã chuyển sang NORMAL MODE' }, 60000);
           } catch (err) {
-            return interaction.editReply({ content: `[ERROR] Lỗi khi bật Normal Mode: ${err.message}` });
+            return editReplyWithAutoDelete(interaction, { content: `[ERROR] Lỗi khi bật Normal Mode: ${err.message}` }, 60000);
           }
         }
       }
@@ -362,17 +393,17 @@ function initDiscordBot() {
           // 1. Kiểm tra trạng thái VPS & Server Minecraft
           const { state, publicIp } = await getInstanceStatus(instanceId);
           if (state !== 'running') {
-            return interaction.editReply({
+            return editReplyWithAutoDelete(interaction, {
               content: `[ERROR] VPS hiện tại đang ở trạng thái \`${state.toUpperCase()}\`. Vui lòng bật VPS trước khi gửi lệnh!`
-            });
+            }, 60000);
           }
 
           const mcPort = parseInt(process.env.MC_PORT || '25565', 10);
           const mcOnline = publicIp ? await checkMinecraftServerStatus(publicIp, mcPort) : false;
           if (!mcOnline) {
-            return interaction.editReply({
+            return editReplyWithAutoDelete(interaction, {
               content: '[ERROR] Server Minecraft hiện tại đang OFFLINE hoặc đang khởi động. Vui lòng chờ Server online trước khi gửi lệnh!'
-            });
+            }, 60000);
           }
 
           // 2. Gửi lệnh tới Minecraft Console qua RCON
@@ -388,9 +419,9 @@ function initDiscordBot() {
             content: `[MINECRAFT CONSOLE] Lệnh: \`/${mcCmd.replace(/^\//, '')}\`\n\`\`\`text\n${formattedOutput}\n\`\`\``
           });
         } catch (err) {
-          return interaction.editReply({
+          return editReplyWithAutoDelete(interaction, {
             content: `[ERROR] Lỗi khi thực thi lệnh Minecraft: ${err.message}`
-          });
+          }, 60000);
         }
       }
 
@@ -439,9 +470,9 @@ function initDiscordBot() {
         await interaction.deferReply({ ephemeral: true });
         try {
           const res = await startInstance(instanceId);
-          return interaction.editReply({ content: `[START] Đã gửi lệnh bật VPS! Status: \`${res.currentState}\`. Vui lòng chờ 30-60s.` });
+          return editReplyWithAutoDelete(interaction, { content: `[START] Đã gửi lệnh bật VPS! Status: \`${res.currentState}\`. Vui lòng chờ 30-60s.` }, 60000);
         } catch (err) {
-          return interaction.editReply({ content: `[ERROR] Lỗi khi bật VPS: ${err.message}` });
+          return editReplyWithAutoDelete(interaction, { content: `[ERROR] Lỗi khi bật VPS: ${err.message}` }, 60000);
         }
       }
 
@@ -450,9 +481,9 @@ function initDiscordBot() {
         await interaction.deferReply({ ephemeral: true });
         try {
           await stopInstance(instanceId);
-          return interaction.editReply({ content: '[STOP] Đã gửi lệnh tắt VPS thành công!' });
+          return editReplyWithAutoDelete(interaction, { content: '[STOP] Đã gửi lệnh tắt VPS thành công!' }, 60000);
         } catch (err) {
-          return interaction.editReply({ content: `[ERROR] Lỗi khi tắt VPS: ${err.message}` });
+          return editReplyWithAutoDelete(interaction, { content: `[ERROR] Lỗi khi tắt VPS: ${err.message}` }, 60000);
         }
       }
 
@@ -462,9 +493,9 @@ function initDiscordBot() {
         try {
           const mcCmd = process.env.MC_START_COMMAND || 'sudo systemctl restart minecraft';
           await runSSMStartMinecraftCommand(instanceId, mcCmd);
-          return interaction.editReply({ content: '[RESTART] Đã gửi lệnh Restart Minecraft Server!' });
+          return editReplyWithAutoDelete(interaction, { content: '[RESTART] Đã gửi lệnh Restart Minecraft Server!' }, 60000);
         } catch (err) {
-          return interaction.editReply({ content: `[ERROR] Lỗi khi Restart: ${err.message}` });
+          return editReplyWithAutoDelete(interaction, { content: `[ERROR] Lỗi khi Restart: ${err.message}` }, 60000);
         }
       }
 
@@ -474,9 +505,9 @@ function initDiscordBot() {
         try {
           await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py dev || sudo touch /opt/mc-autoshutdown/DEV_MODE');
           currentMode = 'dev';
-          return interaction.editReply({ content: '[DEV MODE] Đã kích hoạt DEV MODE thành công' });
+          return editReplyWithAutoDelete(interaction, { content: '[DEV MODE] Đã kích hoạt DEV MODE thành công' }, 60000);
         } catch (err) {
-          return interaction.editReply({ content: `[ERROR] Lỗi khi bật Dev Mode: ${err.message}` });
+          return editReplyWithAutoDelete(interaction, { content: `[ERROR] Lỗi khi bật Dev Mode: ${err.message}` }, 60000);
         }
       }
 
@@ -486,9 +517,9 @@ function initDiscordBot() {
         try {
           await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py normal || sudo rm -f /opt/mc-autoshutdown/DEV_MODE');
           currentMode = 'normal';
-          return interaction.editReply({ content: '[NORMAL MODE] Đã kích hoạt NORMAL MODE thành công' });
+          return editReplyWithAutoDelete(interaction, { content: '[NORMAL MODE] Đã kích hoạt NORMAL MODE thành công' }, 60000);
         } catch (err) {
-          return interaction.editReply({ content: `[ERROR] Lỗi khi bật Normal Mode: ${err.message}` });
+          return editReplyWithAutoDelete(interaction, { content: `[ERROR] Lỗi khi bật Normal Mode: ${err.message}` }, 60000);
         }
       }
 
@@ -582,9 +613,9 @@ function initDiscordBot() {
     if (lowerContent === '!start') {
       try {
         const res = await startInstance(instanceId);
-        return message.reply(`[START] Đã gửi lệnh bật VPS (${instanceId})! Status: \`${res.currentState}\`.`);
+        return sendAutoDeleteReply(message, `[START] Đã gửi lệnh bật VPS (${instanceId})! Status: \`${res.currentState}\`.`, 60000);
       } catch (err) {
-        return message.reply(`[ERROR] Không thể bật VPS: ${err.message}`);
+        return sendAutoDeleteReply(message, `[ERROR] Không thể bật VPS: ${err.message}`, 60000);
       }
     }
 
@@ -592,9 +623,9 @@ function initDiscordBot() {
     if (lowerContent === '!stop') {
       try {
         await stopInstance(instanceId);
-        return message.reply(`[STOP] Đã gửi lệnh tắt VPS (${instanceId})!`);
+        return sendAutoDeleteReply(message, `[STOP] Đã gửi lệnh tắt VPS (${instanceId})!`, 60000);
       } catch (err) {
-        return message.reply(`[ERROR] Không thể tắt VPS: ${err.message}`);
+        return sendAutoDeleteReply(message, `[ERROR] Không thể tắt VPS: ${err.message}`, 60000);
       }
     }
 
@@ -603,9 +634,9 @@ function initDiscordBot() {
       try {
         const mcCmd = process.env.MC_START_COMMAND || 'sudo systemctl restart minecraft';
         await runSSMStartMinecraftCommand(instanceId, mcCmd);
-        return message.reply('[RESTART] Đã gửi lệnh Restart Minecraft Server!');
+        return sendAutoDeleteReply(message, '[RESTART] Đã gửi lệnh Restart Minecraft Server!', 60000);
       } catch (err) {
-        return message.reply(`[ERROR] Không thể Restart: ${err.message}`);
+        return sendAutoDeleteReply(message, `[ERROR] Không thể Restart: ${err.message}`, 60000);
       }
     }
 
@@ -614,9 +645,9 @@ function initDiscordBot() {
       try {
         await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py dev || sudo touch /opt/mc-autoshutdown/DEV_MODE');
         currentMode = 'dev';
-        return message.reply('[DEV MODE] Đã chuyển sang DEV MODE');
+        return sendAutoDeleteReply(message, '[DEV MODE] Đã chuyển sang DEV MODE', 60000);
       } catch (err) {
-        return message.reply(`[ERROR] Lỗi khi bật Dev Mode: ${err.message}`);
+        return sendAutoDeleteReply(message, `[ERROR] Lỗi khi bật Dev Mode: ${err.message}`, 60000);
       }
     }
 
@@ -625,9 +656,9 @@ function initDiscordBot() {
       try {
         await runSSMStartMinecraftCommand(instanceId, 'python3 /opt/mc-autoshutdown/auto_shutdown.py normal || sudo rm -f /opt/mc-autoshutdown/DEV_MODE');
         currentMode = 'normal';
-        return message.reply('[NORMAL MODE] Đã chuyển sang NORMAL MODE');
+        return sendAutoDeleteReply(message, '[NORMAL MODE] Đã chuyển sang NORMAL MODE', 60000);
       } catch (err) {
-        return message.reply(`[ERROR] Lỗi khi bật Normal Mode: ${err.message}`);
+        return sendAutoDeleteReply(message, `[ERROR] Lỗi khi bật Normal Mode: ${err.message}`, 60000);
       }
     }
 
@@ -635,19 +666,19 @@ function initDiscordBot() {
     if (lowerContent.startsWith('!cmd ')) {
       const mcCmd = content.substring(5).trim();
       if (!mcCmd) {
-        return message.reply('[WARN] Vui lòng nhập câu lệnh Minecraft. Ví dụ: `!cmd list` hoặc `!cmd say Hello`');
+        return sendAutoDeleteReply(message, '[WARN] Vui lòng nhập câu lệnh Minecraft. Ví dụ: `!cmd list` hoặc `!cmd say Hello`', 60000);
       }
 
       try {
         const { state, publicIp } = await getInstanceStatus(instanceId);
         if (state !== 'running') {
-          return message.reply(`[ERROR] VPS hiện tại đang ở trạng thái \`${state.toUpperCase()}\`. Vui lòng bật VPS trước khi gửi lệnh!`);
+          return sendAutoDeleteReply(message, `[ERROR] VPS hiện tại đang ở trạng thái \`${state.toUpperCase()}\`. Vui lòng bật VPS trước khi gửi lệnh!`, 60000);
         }
 
         const mcPort = parseInt(process.env.MC_PORT || '25565', 10);
         const mcOnline = publicIp ? await checkMinecraftServerStatus(publicIp, mcPort) : false;
         if (!mcOnline) {
-          return message.reply('[ERROR] Server Minecraft hiện tại đang OFFLINE hoặc đang khởi động. Vui lòng chờ Server online trước khi gửi lệnh!');
+          return sendAutoDeleteReply(message, '[ERROR] Server Minecraft hiện tại đang OFFLINE hoặc đang khởi động. Vui lòng chờ Server online trước khi gửi lệnh!', 60000);
         }
 
         const result = await sendMinecraftRconCommand(instanceId, publicIp, mcCmd);
