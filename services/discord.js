@@ -12,7 +12,7 @@ const {
 } = require('discord.js');
 
 const { getInstanceStatus, startInstance, stopInstance, runSSMStartMinecraftCommand } = require('./aws');
-const { checkMinecraftServerStatus } = require('./minecraft');
+const { checkMinecraftServerStatus, sendMinecraftRconCommand } = require('./minecraft');
 const { generatePufferPanelSSMCommand } = require('./pufferpanel');
 
 let client = null;
@@ -202,10 +202,10 @@ async function registerSlashCommands(clientId, token) {
       ),
     new SlashCommandBuilder()
       .setName('cmd')
-      .setDescription('Gửi lệnh tới Server Minecraft')
+      .setDescription('Gửi lệnh trực tiếp vào Console Server Minecraft')
       .addStringOption(option =>
         option.setName('command')
-          .setDescription('Lệnh cần dùng')
+          .setDescription('Lệnh Minecraft cần thực thi (VD: list, say Hello, op player)')
           .setRequired(true)
       ),
     new SlashCommandBuilder()
@@ -357,12 +357,40 @@ function initDiscordBot() {
 
       if (commandName === 'cmd') {
         await interaction.deferReply();
-        const shellCmd = interaction.options.getString('command');
+        const mcCmd = interaction.options.getString('command');
         try {
-          await runSSMStartMinecraftCommand(instanceId, shellCmd);
-          return interaction.editReply({ content: `[EXEC] Đã gửi lệnh:\n\`\`\`bash\n${shellCmd}\n\`\`\`` });
+          // 1. Kiểm tra trạng thái VPS & Server Minecraft
+          const { state, publicIp } = await getInstanceStatus(instanceId);
+          if (state !== 'running') {
+            return interaction.editReply({
+              content: `[ERROR] VPS hiện tại đang ở trạng thái \`${state.toUpperCase()}\`. Vui lòng bật VPS trước khi gửi lệnh!`
+            });
+          }
+
+          const mcPort = parseInt(process.env.MC_PORT || '25565', 10);
+          const mcOnline = publicIp ? await checkMinecraftServerStatus(publicIp, mcPort) : false;
+          if (!mcOnline) {
+            return interaction.editReply({
+              content: '[ERROR] Server Minecraft hiện tại đang OFFLINE hoặc đang khởi động. Vui lòng chờ Server online trước khi gửi lệnh!'
+            });
+          }
+
+          // 2. Gửi lệnh tới Minecraft Console qua RCON
+          const result = await sendMinecraftRconCommand(instanceId, publicIp, mcCmd);
+
+          // 3. Format kết quả trả về Discord (Giới hạn tối đa 1800 ký tự)
+          let formattedOutput = result || '(Lệnh đã thực thi thành công, không có phản hồi văn bản)';
+          if (formattedOutput.length > 1800) {
+            formattedOutput = formattedOutput.substring(0, 1800) + '\n... (Nội dung đã được cắt bớt do quá dài)';
+          }
+
+          return interaction.editReply({
+            content: `[MINECRAFT CONSOLE] Lệnh: \`/${mcCmd.replace(/^\//, '')}\`\n\`\`\`text\n${formattedOutput}\n\`\`\``
+          });
         } catch (err) {
-          return interaction.editReply({ content: `[ERROR] Lỗi khi gửi lệnh: ${err.message}` });
+          return interaction.editReply({
+            content: `[ERROR] Lỗi khi thực thi lệnh Minecraft: ${err.message}`
+          });
         }
       }
 
@@ -372,14 +400,14 @@ function initDiscordBot() {
           .setTitle('Tro giup')
           .setDescription('Danh sách các lệnh:')
           .addFields(
-            { name: '`/status` hoặc `!status`', value: 'Xem trạng thái VPS VPS và Minecraft Server realtime.', inline: false },
+            { name: '`/status` hoặc `!status`', value: 'Xem trạng thái VPS và Minecraft Server realtime.', inline: false },
             { name: '`/panel` hoặc `!panel`', value: 'Mở Bảng điều khiển Dashboard trực quan dạng nút bấm.', inline: false },
-            { name: '`/start` hoặc `!start`', value: 'Khởi động VPS VPS và Minecraft Server.', inline: false },
-            { name: '`/stop` hoặc `!stop`', value: 'Tắt Minecraft Server an toàn và ngắt VPS VPS.', inline: false },
+            { name: '`/start` hoặc `!start`', value: 'Khởi động VPS và Minecraft Server.', inline: false },
+            { name: '`/stop` hoặc `!stop`', value: 'Tắt Minecraft Server an toàn và ngắt VPS.', inline: false },
             { name: '`/restart` hoặc `!restart`', value: 'Khởi động lại Minecraft Server.', inline: false },
             { name: '`/mode dev` hoặc `!dev on`', value: 'Bật Dev Mode (Server chạy 24/7).', inline: false },
             { name: '`/mode normal` hoặc `!dev off`', value: 'Bật Normal Mode (Tự động tắt sau 30p 0 người chơi).', inline: false },
-            { name: '`/cmd <lệnh>` hoặc `!cmd <lệnh>`', value: 'Gửi lệnh trực tiếp vào VPS.', inline: false }
+            { name: '`/cmd <lệnh>` hoặc `!cmd <lệnh>`', value: 'Gửi lệnh trực tiếp vào Console Server Minecraft và nhận kết quả.', inline: false }
           );
         return interaction.reply({ embeds: [helpEmbed] });
       }
@@ -545,7 +573,7 @@ function initDiscordBot() {
           { name: '`!restart`', value: 'Khởi động lại Minecraft Server.', inline: false },
           { name: '`!dev on` / `!mode dev`', value: 'Bật Dev Mode.', inline: false },
           { name: '`!dev off` / `!mode normal`', value: 'Bật Normal Mode.', inline: false },
-          { name: '`!cmd <lệnh>`', value: 'Gửi lệnh trực tiếp sang VPS.', inline: false }
+          { name: '`!cmd <lệnh>`', value: 'Gửi lệnh trực tiếp vào Console Server Minecraft và nhận kết quả.', inline: false }
         );
       return message.reply({ embeds: [helpEmbed] });
     }
@@ -603,14 +631,35 @@ function initDiscordBot() {
       }
     }
 
-    // Direct SSM Command: !cmd <command>
+    // Direct Minecraft RCON Command: !cmd <command>
     if (lowerContent.startsWith('!cmd ')) {
-      const shellCmd = content.substring(5).trim();
+      const mcCmd = content.substring(5).trim();
+      if (!mcCmd) {
+        return message.reply('[WARN] Vui lòng nhập câu lệnh Minecraft. Ví dụ: `!cmd list` hoặc `!cmd say Hello`');
+      }
+
       try {
-        await runSSMStartMinecraftCommand(instanceId, shellCmd);
-        return message.reply(`[EXEC] Đã gửi lệnh:\n\`\`\`bash\n${shellCmd}\n\`\`\``);
+        const { state, publicIp } = await getInstanceStatus(instanceId);
+        if (state !== 'running') {
+          return message.reply(`[ERROR] VPS hiện tại đang ở trạng thái \`${state.toUpperCase()}\`. Vui lòng bật VPS trước khi gửi lệnh!`);
+        }
+
+        const mcPort = parseInt(process.env.MC_PORT || '25565', 10);
+        const mcOnline = publicIp ? await checkMinecraftServerStatus(publicIp, mcPort) : false;
+        if (!mcOnline) {
+          return message.reply('[ERROR] Server Minecraft hiện tại đang OFFLINE hoặc đang khởi động. Vui lòng chờ Server online trước khi gửi lệnh!');
+        }
+
+        const result = await sendMinecraftRconCommand(instanceId, publicIp, mcCmd);
+
+        let formattedOutput = result || '(Lệnh đã thực thi thành công, không có phản hồi văn bản)';
+        if (formattedOutput.length > 1800) {
+          formattedOutput = formattedOutput.substring(0, 1800) + '\n... (Nội dung đã được cắt bớt do quá dài)';
+        }
+
+        return message.reply(`[MINECRAFT CONSOLE] Lệnh: \`/${mcCmd.replace(/^\//, '')}\`\n\`\`\`text\n${formattedOutput}\n\`\`\``);
       } catch (err) {
-        return message.reply(`[ERROR] Lỗi gửi lệnh: ${err.message}`);
+        return message.reply(`[ERROR] Lỗi khi thực thi lệnh Minecraft: ${err.message}`);
       }
     }
   });
