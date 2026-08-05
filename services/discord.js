@@ -58,8 +58,8 @@ async function sendAutoDeleteReply(message, options, delayMs = 60000) {
   try {
     const sentMsg = await message.reply(options);
     setTimeout(() => {
-      sentMsg.delete().catch(() => {});
-      message.delete().catch(() => {});
+      sentMsg.delete().catch(() => { });
+      message.delete().catch(() => { });
     }, delayMs);
     return sentMsg;
   } catch (err) {
@@ -74,12 +74,67 @@ async function editReplyWithAutoDelete(interaction, options, delayMs = 60000) {
   try {
     const res = await interaction.editReply(options);
     setTimeout(() => {
-      interaction.deleteReply().catch(() => {});
+      interaction.deleteReply().catch(() => { });
     }, delayMs);
     return res;
   } catch (err) {
     console.error('[Discord Bot Error] Không thể chỉnh sửa/xóa interaction reply:', err.message);
   }
+}
+
+/**
+ * Tự động làm mới Embed dữ liệu mỗi 5s và xóa tin nhắn sau 5 phút (Interaction)
+ */
+async function startAutoRefreshInteractionPanel(interaction, refreshIntervalMs = 5000, totalDurationMs = 300000) {
+  const { embed, ec2State } = await buildStatusEmbed();
+  await interaction.editReply({ embeds: [embed], components: getDashboardActionRows(ec2State) });
+
+  const startTime = Date.now();
+  const intervalId = setInterval(async () => {
+    if (Date.now() - startTime >= totalDurationMs) {
+      clearInterval(intervalId);
+      interaction.deleteReply().catch(() => { });
+      return;
+    }
+
+    try {
+      const { embed: updatedEmbed, ec2State: updatedState } = await buildStatusEmbed();
+      await interaction.editReply({
+        embeds: [updatedEmbed],
+        components: getDashboardActionRows(updatedState)
+      });
+    } catch (err) {
+      clearInterval(intervalId);
+    }
+  }, refreshIntervalMs);
+}
+
+/**
+ * Tự động làm mới Embed dữ liệu mỗi 5s và xóa tin nhắn sau 5 phút (Message Prefix)
+ */
+async function startAutoRefreshMessagePanel(message, refreshIntervalMs = 5000, totalDurationMs = 300000) {
+  const { embed, ec2State } = await buildStatusEmbed();
+  const sentMsg = await message.reply({ embeds: [embed], components: getDashboardActionRows(ec2State) });
+
+  const startTime = Date.now();
+  const intervalId = setInterval(async () => {
+    if (Date.now() - startTime >= totalDurationMs) {
+      clearInterval(intervalId);
+      sentMsg.delete().catch(() => { });
+      message.delete().catch(() => { });
+      return;
+    }
+
+    try {
+      const { embed: updatedEmbed, ec2State: updatedState } = await buildStatusEmbed();
+      await sentMsg.edit({
+        embeds: [updatedEmbed],
+        components: getDashboardActionRows(updatedState)
+      });
+    } catch (err) {
+      clearInterval(intervalId);
+    }
+  }, refreshIntervalMs);
 }
 
 /**
@@ -303,8 +358,7 @@ function initDiscordBot() {
 
       if (commandName === 'status' || commandName === 'panel') {
         await interaction.deferReply();
-        const { embed, ec2State } = await buildStatusEmbed();
-        return interaction.editReply({ embeds: [embed], components: getDashboardActionRows(ec2State) });
+        return startAutoRefreshInteractionPanel(interaction, 5000, 300000);
       }
 
       if (commandName === 'start') {
@@ -587,8 +641,7 @@ function initDiscordBot() {
 
     // Status / Panel / Admin
     if (['!status', '!panel', '!admin'].includes(lowerContent)) {
-      const { embed, ec2State } = await buildStatusEmbed();
-      return message.reply({ embeds: [embed], components: getDashboardActionRows(ec2State) });
+      return startAutoRefreshMessagePanel(message, 5000, 300000);
     }
 
     // Help
