@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const serverIpEl = document.getElementById('server-ip');
   const btnCopyIp = document.getElementById('btn-copy-ip');
   const copyTextEl = document.getElementById('copy-text');
+  const copyIconEl = document.getElementById('copy-icon');
   const btnRefresh = document.getElementById('btn-refresh');
 
   // Action Sections
@@ -42,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let turnstileWidgetId = null;
   let turnstileSiteKey = '';
   let isWaitingApproval = false;
+  let toastTimeout = null;
 
   // 5-Minute Lock State Variables
   let lock5MinInterval = null;
@@ -50,6 +52,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const requestMcDesc = document.getElementById('request-mc-desc');
   const btnRequestMcIcon = document.getElementById('btn-request-mc-icon');
   const btnRequestMcText = document.getElementById('btn-request-mc-text');
+
+  // SVG Icons for Copy Button
+  const COPY_SVG = `<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>`;
+  const CHECK_SVG = `<polyline points="20 6 9 17 4 12"></polyline>`;
+
+  // SVG Icons for Request Button
+  const LOCK_SVG = `<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>`;
+  const CHAT_SVG = `<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>`;
 
   // ----------------------------------------------------
   // BACKGROUND BLUR & OVERLAY CONTROL LOGIC
@@ -79,6 +89,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !blurModal.classList.contains('hidden')) {
+        blurModal.classList.add('hidden');
+      }
+    });
+
     // Blur Slider Change
     sliderBlur.addEventListener('input', (e) => {
       const val = e.target.value;
@@ -99,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
       applyOverlay('55');
       localStorage.removeItem('user_bg_blur');
       localStorage.removeItem('user_bg_overlay');
-      showToast('Đã khôi phục cài đặt độ mờ mặc định!');
+      showToast('Đã khôi phục cài đặt hình nền mặc định!');
     });
   }
 
@@ -118,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function applyOverlay(opacityPercent) {
     const opacityDec = parseInt(opacityPercent, 10) / 100;
     if (bgOverlayLayer) {
-      bgOverlayLayer.style.background = `rgba(15, 23, 42, ${opacityDec})`;
+      bgOverlayLayer.style.background = `rgba(11, 17, 32, ${opacityDec})`;
     }
     if (overlayValText) {
       overlayValText.textContent = `${opacityPercent}%`;
@@ -145,15 +162,21 @@ document.addEventListener('DOMContentLoaded', () => {
   // Refresh Button
   btnRefresh.addEventListener('click', () => {
     fetchStatus();
-    showToast('Đang cập nhật trạng thái...');
+    showToast('Đang làm mới trạng thái...');
   });
 
   // Copy Address Button
   btnCopyIp.addEventListener('click', () => {
     const ipText = serverIpEl.textContent;
     navigator.clipboard.writeText(ipText).then(() => {
-      copyTextEl.textContent = 'Đã sao chép!';
-      setTimeout(() => copyTextEl.textContent = 'Sao chép', 2000);
+      if (copyIconEl) copyIconEl.innerHTML = CHECK_SVG;
+      copyTextEl.textContent = 'Đã chép!';
+      setTimeout(() => {
+        if (copyIconEl) copyIconEl.innerHTML = COPY_SVG;
+        copyTextEl.textContent = 'Sao chép';
+      }, 2000);
+    }).catch(() => {
+      showToast('Không thể sao chép tự động.');
     });
   });
 
@@ -183,11 +206,11 @@ document.addEventListener('DOMContentLoaded', () => {
       // Lưu mốc thời gian bắt đầu bật VPS vào localStorage để khóa nút 5 phút
       localStorage.setItem('vps_start_time', Date.now().toString());
 
-      showToast('[INFO] ' + (data.message || 'Đang khởi động VPS EC2...'));
+      showToast(data.message || 'Đang tiến hành khởi động máy chủ EC2...');
       fetchStatus();
 
     } catch (err) {
-      showToast('[ERROR] ' + err.message);
+      showToast(err.message);
       showSection(sectionStartEc2);
       resetCaptcha();
     }
@@ -212,17 +235,17 @@ document.addEventListener('DOMContentLoaded', () => {
       isWaitingApproval = false;
 
       if (res.ok && data.status === 'approved') {
-        showToast('[SUCCESS] Admin đã duyệt! Đang bật Minecraft Server...');
+        showToast('Admin đã phê duyệt! Đang kích hoạt Minecraft Server...');
         showSection(sectionStarting);
-        document.getElementById('starting-title').textContent = 'Đang Bật Minecraft Server qua AWS SSM...';
+        document.getElementById('starting-title').textContent = 'Đang Bật Minecraft Server...';
         setTimeout(() => fetchStatus(), 5000);
       } else {
-        throw new Error(data.error || 'Yêu cầu bị từ chối hoặc hết hạn.');
+        throw new Error(data.error || 'Yêu cầu bị từ chối hoặc đã hết hạn.');
       }
     } catch (err) {
       stop10MinCountdown();
       isWaitingApproval = false;
-      showToast('[ERROR] ' + err.message);
+      showToast(err.message);
       fetchStatus();
     }
   });
@@ -307,7 +330,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function lockRequestMcButton(remainingMs) {
     btnRequestMc.disabled = true;
-    if (btnRequestMcIcon) btnRequestMcIcon.textContent = '[LOCKED]';
+    if (btnRequestMcIcon) {
+      const svg = btnRequestMcIcon.querySelector('svg');
+      if (svg) svg.innerHTML = LOCK_SVG;
+    }
 
     updateLockTimerText(remainingMs);
 
@@ -319,7 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (rem <= 0) {
         clear5MinLock();
         unlockRequestMcButton();
-        showToast('[INFO] Nếu server chưa tự bật, bạn có thể gửi yêu cầu cho Admin.');
+        showToast('Server chưa chạy? Bạn có thể gửi yêu cầu phê duyệt cho Admin.');
       } else {
         updateLockTimerText(rem);
       }
@@ -332,20 +358,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const s = (sec % 60).toString().padStart(2, '0');
 
     if (btnRequestMcText) {
-      btnRequestMcText.textContent = `Tự Động Bật (Khóa Nút Trong ${m}:${s})`;
+      btnRequestMcText.textContent = `Đang tự nạp dữ liệu (Khóa ${m}:${s})`;
     }
     if (requestMcDesc) {
-      requestMcDesc.textContent = `VPS vừa bật. Vui lòng chờ server tự khởi động (khóa nút ${m}:${s}). Nếu sau 5 phút server chưa tự chạy, nút sẽ mở để bạn gửi thông báo cho Admin.`;
+      requestMcDesc.textContent = `VPS vừa khởi động xong. Vui lòng chờ máy chủ tự mở (khóa nút ${m}:${s}). Nếu sau 5 phút vẫn chưa vào được, nút sẽ mở để bạn gửi thông báo cho Admin.`;
     }
   }
 
   function unlockRequestMcButton() {
     clearInterval(lock5MinInterval);
     btnRequestMc.disabled = false;
-    if (btnRequestMcIcon) btnRequestMcIcon.textContent = '💬';
-    if (btnRequestMcText) btnRequestMcText.textContent = 'Gửi Yêu Cầu Bật Minecraft (Qua Discord)';
+    if (btnRequestMcIcon) {
+      const svg = btnRequestMcIcon.querySelector('svg');
+      if (svg) svg.innerHTML = CHAT_SVG;
+    }
+    if (btnRequestMcText) {
+      btnRequestMcText.textContent = 'Gửi Yêu Cầu Bật Minecraft (Qua Discord)';
+    }
     if (requestMcDesc) {
-      requestMcDesc.textContent = 'Vui lòng chờ server tự khởi động hoặc bấm nút bên dưới để gửi thông báo đến Discord của Admin phê duyệt bật Minecraft Server.';
+      requestMcDesc.textContent = 'Vui lòng chờ server tự khởi động hoặc nhấn nút bên dưới để gửi yêu cầu phê duyệt đến Admin qua Discord.';
     }
   }
 
@@ -364,13 +395,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (state === 'running' || state === 'online') {
       el.classList.add('badge-online');
-      textEl.textContent = state === 'running' ? 'Đang Chạy (Running)' : 'Online (Sẵn sàng)';
+      textEl.textContent = state === 'running' ? 'Đang Chạy' : 'Online';
     } else if (state === 'pending') {
       el.classList.add('badge-warning');
-      textEl.textContent = 'Đang Khởi Động...';
+      textEl.textContent = 'Đang Bật...';
     } else {
       el.classList.add('badge-offline');
-      textEl.textContent = state === 'stopped' ? 'Đã Tắt (Stopped)' : 'Offline';
+      textEl.textContent = state === 'stopped' ? 'Đã Tắt' : 'Offline';
     }
   }
 
@@ -389,7 +420,6 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   function initTurnstile(siteKey) {
     if (!siteKey || siteKey.includes('XXXXX')) {
-      // If sitekey is missing, enable button directly
       btnStartEc2.disabled = false;
       return;
     }
@@ -467,10 +497,11 @@ document.addEventListener('DOMContentLoaded', () => {
    * Toast notification display
    */
   function showToast(msg) {
+    if (toastTimeout) clearTimeout(toastTimeout);
     toastEl.textContent = msg;
     toastEl.classList.remove('hidden');
-    setTimeout(() => {
+    toastTimeout = setTimeout(() => {
       toastEl.classList.add('hidden');
-    }, 4000);
+    }, 3800);
   }
 });
